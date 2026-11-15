@@ -46,6 +46,7 @@ let sb = null;
 let currentJobId = null;
 let hasProfiles = false;
 let hasProfileCols = false;
+let hasAjustes = false;
 let profiles = [];
 let currentProfileId = storageGet("cortes.profile") || SEED_PROFILE;
 let allCuts = [];
@@ -143,6 +144,7 @@ function initClient(){
 async function detectSchema(){
   hasProfiles = false;
   hasProfileCols = false;
+  hasAjustes = false;
   const { data, error } = await sb.from("profiles").select("*").order("created_at", { ascending: true });
   if (!error){
     hasProfiles = true;
@@ -154,6 +156,8 @@ async function detectSchema(){
   }
   const probe = await sb.from("cuts").select("id,profile_id").limit(1);
   hasProfileCols = !probe.error;
+  const probeAj = await sb.from("ajustes").select("id").limit(1);
+  hasAjustes = !probeAj.error;
   fillProfileSelects();
   applyTheme(currentProfile());
   const st = $("#style");
@@ -284,6 +288,7 @@ function bindApp(){
   document.addEventListener("keydown", ev => { if (ev.key === "Escape") closePlayer(); });
   $("#player-approve").addEventListener("click", () => decideCurrent("approved"));
   $("#player-reject").addEventListener("click", () => decideCurrent("rejected"));
+  if ($("#ajuste-btn")) $("#ajuste-btn").addEventListener("click", requestAjuste);
 }
 
 async function onRun(e){
@@ -402,6 +407,13 @@ function cutLabel(it){
 }
 
 function decisionOf(id){ return (decMap[id] && decMap[id].decision) || "pending"; }
+function isOpenDecision(d){ return d === "pending" || d === "ajuste pedido"; }
+function decisionMeta(d){
+  if (d === "approved") return { badge: "ok", label: "aprovado" };
+  if (d === "rejected") return { badge: "no", label: "rejeitado" };
+  if (d === "ajuste pedido") return { badge: "ajuste", label: "ajuste pedido" };
+  return { badge: "pending", label: "pendente" };
+}
 
 async function loadFila(){
   const [{ data: cuts, error: e1 }, { data: decs }] = await Promise.all([
@@ -420,9 +432,10 @@ async function loadFila(){
 async function renderFila(){
   const filter = ($("#fila-filter") && $("#fila-filter").value) || "pending";
   let items = allCuts.slice();
-  if (filter === "pending") items = items.filter(it => decisionOf(it.id) === "pending");
+  if (filter === "pending") items = items.filter(it => isOpenDecision(decisionOf(it.id)));
   else if (filter === "approved") items = items.filter(it => decisionOf(it.id) === "approved");
   else if (filter === "rejected") items = items.filter(it => decisionOf(it.id) === "rejected");
+  else if (filter === "ajuste") items = items.filter(it => decisionOf(it.id) === "ajuste pedido");
   else if (filter === "live") items = items.filter(it => it.tag === "live");
   if (!items.length){
     $("#fila").innerHTML = `<p class="muted">Nenhum corte nesta vista. Se a fila estiver vazia, o servidor ainda está sincronizando.</p>`;
@@ -474,7 +487,7 @@ function groupProjects(cuts){
       channel: first.channel || "",
       source_url: url,
       items,
-      pending: items.filter(i => decisionOf(i.id) === "pending").length,
+      pending: items.filter(i => isOpenDecision(decisionOf(i.id))).length,
       cover: (items.find(i => i.cover_path) || {}).cover_path,
     };
   }).sort((a,b) => b.items.length - a.items.length);
@@ -549,8 +562,7 @@ async function renderProjects(projectId, focusNew){
 
 function cardHtml(it, coverUrl){
   const decision = decisionOf(it.id);
-  const badge = decision==="approved" ? "ok" : decision==="rejected" ? "no" : "pending";
-  const decLabel = decision==="approved" ? "aprovado" : decision==="rejected" ? "rejeitado" : "pendente";
+  const { badge, label: decLabel } = decisionMeta(decision);
   const qc = it.qc && it.qc.score != null ? `QC ${it.qc.score}` : (it.qc && it.qc.pass === true ? "QC ok" : "");
   const tag = it.tag === "live" ? `<span class="badge live">live</span>` : "";
   const bg = coverUrl ? `style="background-image:url('${coverUrl}')"` : "";
@@ -573,12 +585,21 @@ async function openPlayer(id){
   if (!it) return;
   playerCut = it;
   const decision = decisionOf(id);
-  const badge = decision==="approved" ? "ok" : decision==="rejected" ? "no" : "pending";
-  const decLabel = decision==="approved" ? "aprovado" : decision==="rejected" ? "rejeitado" : "pendente";
+  const { badge, label: decLabel } = decisionMeta(decision);
   const tag = it.tag === "live" ? `<span class="badge live">live</span>` : "";
   $("#player-badges").innerHTML = `${tag} <span class="badge ${badge}">${decLabel}</span> <span class="badge">${esc(it.version||"")}</span>`;
   $("#player-hook").textContent = it.hook || "Prévia";
   $("#player-meta").textContent = [cutLabel(it), it.title||""].filter(Boolean).join(" · ");
+  const ajText = $("#ajuste-text");
+  const ajErr = $("#ajuste-err");
+  const ajHint = $("#ajuste-hint");
+  if (ajText) ajText.value = "";
+  if (ajErr){ ajErr.hidden = true; ajErr.textContent = ""; }
+  if (ajHint){
+    ajHint.textContent = hasAjustes
+      ? "O pedido fica registrado. Nada é publicado e nada muda sozinho."
+      : "Para pedir ajuste por aqui, cole o SQL de ajustes no Editor SQL do Supabase e atualize a página.";
+  }
   const video = $("#player-video");
   video.pause();
   video.removeAttribute("src");
@@ -633,9 +654,70 @@ function decideCurrent(act){
   decide(playerCut.id, act);
 }
 
+async function requestAjuste(){
+  if (!playerCut) return;
+  const text = (($("#ajuste-text") || {}).value || "").trim();
+  const err = $("#ajuste-err");
+  if (err){ err.hidden = true; err.textContent = ""; }
+  if (!text){
+    if (err){ err.hidden = false; err.textContent = "Escreve o que você quer ajustar."; }
+    return;
+  }
+  if (!hasAjustes){
+    const msg = "Para pedir ajuste por aqui, cole o SQL de ajustes no Editor SQL do Supabase e atualize a página.";
+    if (err){ err.hidden = false; err.textContent = msg; }
+    toast(msg);
+    return;
+  }
+  const { data: sessionData } = await sb.auth.getUser();
+  const user = sessionData && sessionData.user;
+  const row = {
+    cut_id: playerCut.id,
+    request: text,
+    status: "ajuste pedido",
+    hook: playerCut.hook || null,
+    version: playerCut.version || null,
+  };
+  if (hasProfileCols){
+    row.profile_id = currentProfile().id;
+    row.workspace_id = currentProfile().workspace_id || SEED_WORKSPACE;
+  }
+  if (user) row.requested_by = user.id;
+  const { error } = await sb.from("ajustes").insert(row);
+  if (error){
+    const msg = error.message || "Não consegui salvar o pedido.";
+    if (err){ err.hidden = false; err.textContent = msg; }
+    toast(msg);
+    return;
+  }
+  const dec = {
+    cut_id: playerCut.id,
+    decision: "ajuste pedido",
+    at: new Date().toISOString(),
+    hook: playerCut.hook,
+    version: playerCut.version,
+    source: playerCut.source,
+    tag: playerCut.tag,
+  };
+  if (hasProfileCols){
+    dec.profile_id = currentProfile().id;
+    dec.workspace_id = currentProfile().workspace_id || SEED_WORKSPACE;
+  }
+  const decRes = await sb.from("decisions").upsert(dec);
+  if (!decRes.error) decMap[playerCut.id] = { cut_id: playerCut.id, decision: "ajuste pedido" };
+  if ($("#ajuste-text")) $("#ajuste-text").value = "";
+  toast("Pedido de ajuste registrado. Nada foi publicado e nada muda sozinho.");
+  const meta = decisionMeta("ajuste pedido");
+  const tag = playerCut.tag === "live" ? `<span class="badge live">live</span>` : "";
+  $("#player-badges").innerHTML = `${tag} <span class="badge ${meta.badge}">${meta.label}</span> <span class="badge">${esc(playerCut.version||"")}</span>`;
+  renderFila();
+  renderDashboard();
+  if (parseRoute().tab === "projetos") renderProjects(parseRoute().projectId, parseRoute().focusNew);
+}
+
 async function renderDashboard(){
   const items = allCuts;
-  const pending = items.filter(it => decisionOf(it.id) === "pending");
+  const pending = items.filter(it => isOpenDecision(decisionOf(it.id)));
   const approved = items.filter(it => decisionOf(it.id) === "approved");
   const live = items.filter(it => it.tag === "live");
   $("#dash-stats").innerHTML = [

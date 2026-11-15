@@ -23,7 +23,7 @@
     #boot-error.is-on{display:block}
     noscript p{max-width:420px;margin:16px auto;color:#ffd400}
   </style>
-  <link rel="stylesheet" href="css/app.css?v=fixsafari2">
+  <link rel="stylesheet" href="css/app.css?v=ajuste1">
   <script>
     (function () {
       try {
@@ -197,6 +197,7 @@
                 <option value="all">Todos</option>
                 <option value="approved">Aprovados</option>
                 <option value="rejected">Rejeitados</option>
+                <option value="ajuste">Ajuste pedido</option>
                 <option value="live">Lives</option>
               </select>
               <button type="button" class="btn ghost" id="reload-fila">Atualizar</button>
@@ -314,14 +315,21 @@
           <button type="button" class="btn danger" id="player-reject">Rejeitar</button>
         </div>
         <p class="hint tight">Aprovar só registra a decisão. Nada é publicado.</p>
+        <div class="ajuste" id="player-ajuste">
+          <label for="ajuste-text">Pedir ajuste</label>
+          <textarea id="ajuste-text" rows="3" maxlength="1000" placeholder="Ex.: o gancho aparece, mas nos primeiros segundos ele está falando outra coisa."></textarea>
+          <button type="button" class="btn ghost" id="ajuste-btn">Pedir ajuste</button>
+          <p class="hint tight" id="ajuste-hint">O pedido fica registrado. Nada é publicado e nada muda sozinho.</p>
+          <p class="error" id="ajuste-err" hidden></p>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=fixsafari2"></script>
-  <script src="js/supabase.umd.js?v=fixsafari2"></script>
-  <script src="js/app.js?v=fixsafari2" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
+  <script src="js/config.js?v=ajuste1"></script>
+  <script src="js/supabase.umd.js?v=ajuste1"></script>
+  <script src="js/app.js?v=ajuste1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
 </body>
 </html>

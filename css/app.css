@@ -191,3 +191,10 @@ a.proj .meta{margin:0}
 #project-back{align-self:flex-start}
 #project-hero h2{margin-top:0}
 #project-hero a{color:var(--accent)}
+
+.badge.ajuste{background:#3a2a00;color:#ffd400}
+.ajuste{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.ajuste label{display:block;font-size:.78rem;font-weight:700;letter-spacing:.02em}
+.ajuste textarea{min-height:72px;max-height:160px}
+.ajuste .btn{width:100%;margin-top:8px;justify-content:center}
+.ajuste .hint{margin-top:8px}
