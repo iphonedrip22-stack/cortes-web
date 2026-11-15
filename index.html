@@ -12,6 +12,7 @@
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
       min-height:100%;min-height:100vh}
     #gate{min-height:100vh;padding:24px;display:block}
+    body.is-in #gate,body.is-in .gate{display:none !important}
     #login-form{max-width:420px;margin:12vh auto 0;background:#14171c;border:1px solid #2a3038;border-radius:16px;padding:18px}
     #login-form h1{margin:0 0 4px;font-size:1.35rem}
     #login-form p{margin:0 0 12px;color:#8b93a1;font-size:.85rem}
@@ -22,7 +23,7 @@
     #boot-error.is-on{display:block}
     noscript p{max-width:420px;margin:16px auto;color:#ffd400}
   </style>
-  <link rel="stylesheet" href="css/app.css?v=fixsafari1">
+  <link rel="stylesheet" href="css/app.css?v=fixsafari2">
   <script>
     (function () {
       try {
@@ -319,8 +320,8 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=fixsafari1"></script>
-  <script src="js/supabase.umd.js?v=fixsafari1"></script>
-  <script src="js/app.js?v=fixsafari1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
+  <script src="js/config.js?v=fixsafari2"></script>
+  <script src="js/supabase.umd.js?v=fixsafari2"></script>
+  <script src="js/app.js?v=fixsafari2" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
 </body>
 </html>
