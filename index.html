@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Direto ao Osso — Esteira de cortes</title>
+  <link rel="stylesheet" href="css/app.css">
+  <meta name="robots" content="noindex,nofollow">
+</head>
+<body>
+  <section class="gate" id="gate">
+    <form class="card" id="login-form">
+      <div class="brand" style="margin-bottom:16px">
+        <span class="mark">DO</span>
+        <div>
+          <h1>Direto ao Osso</h1>
+          <p>Esteira de cortes · acesso restrito</p>
+        </div>
+      </div>
+      <p class="hint" id="config-warn" hidden>Esta página ainda não foi ligada ao banco. Quando o setup terminar, recarregue e entre com o e-mail e a senha do arquivo de acesso.</p>
+      <label>E-mail
+        <input type="email" id="email" autocomplete="username" required>
+      </label>
+      <label>Senha
+        <input type="password" id="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="login-err" hidden></p>
+      <button type="submit" class="btn primary" id="login-btn">Entrar</button>
+      <p class="hint">Aprovar e rejeitar só registram a sua decisão. Nada é publicado por aqui.</p>
+    </form>
+  </section>
+
+  <div id="app-shell">
+    <header class="top">
+      <div class="brand">
+        <span class="mark">DO</span>
+        <div>
+          <h1>Direto ao Osso</h1>
+          <p>Esteira de cortes · nada é publicado por aqui</p>
+        </div>
+      </div>
+      <div class="userbar"><button type="button" class="btn ghost" id="logout-btn">Sair</button></div>
+      <nav class="tabs" role="tablist">
+        <button class="tab is-on" data-tab="esteira">Esteira</button>
+        <button class="tab" data-tab="fila">Fila</button>
+        <button class="tab" data-tab="lives">Lives</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="tab-esteira" class="panel is-on">
+        <form id="run-form" class="card run">
+          <h2>Rodar a esteira</h2>
+          <label>Link do YouTube
+            <input type="url" name="url" id="url" placeholder="https://www.youtube.com/watch?v=…">
+          </label>
+          <p class="or">ou envie o arquivo do vídeo (útil se o YouTube bloquear o download)</p>
+          <label class="file">Arquivo de vídeo (até 80 MB)
+            <input type="file" name="file" id="file" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,.mp4,.mov,.mkv,.webm">
+            <span class="upload-name" id="file-name"></span>
+          </label>
+          <label>Estilo de edição
+            <select name="style" id="style">
+              <option value="close">Close (gancho + word-pop)</option>
+              <option value="letterbox">Faixas (letterbox)</option>
+              <option value="split">Meia tela</option>
+              <option value="humor">Resenha / meme</option>
+              <option value="storytelling">Storytelling</option>
+            </select>
+          </label>
+          <div class="row">
+            <button type="submit" class="btn primary" id="run-btn">Rodar esteira</button>
+            <button type="button" class="btn ghost" id="cancel-btn" hidden>Cancelar</button>
+          </div>
+          <p class="hint">A esteira baixa, transcreve, escolhe trechos, edita e faz o controle de qualidade no servidor. Música desligada, efeitos no padrão novo. Aprovar um corte não publica nada.</p>
+        </form>
+        <div class="card" id="job-card">
+          <h2>Andamento</h2>
+          <p class="muted" id="job-empty">Nenhuma esteira rodando agora.</p>
+          <div id="job-body" hidden>
+            <p class="job-meta" id="job-meta"></p>
+            <ol class="stages" id="stages"></ol>
+            <pre class="log" id="job-log" hidden></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-fila" class="panel">
+        <div class="fila-head">
+          <h2>Fila de cortes</h2>
+          <button type="button" class="btn ghost" id="reload-fila">Atualizar</button>
+        </div>
+        <p class="hint">Aprovar e rejeitar só gravam a sua decisão. Nada é publicado.</p>
+        <div id="fila" class="grid"></div>
+      </section>
+
+      <section id="tab-lives" class="panel">
+        <div class="card">
+          <h2>Monitoramento de lives</h2>
+          <p class="hint">A cada cerca de 3 minutos o servidor verifica se algum canal da lista está ao vivo. Cortes de 30 a 60 s entram nesta mesma fila, com a etiqueta <strong>live</strong>. No máximo 2 lives ao mesmo tempo. TikTok é experimental. Instagram Live está fora de escopo (precisa de login). Nada é publicado.</p>
+          <form id="lives-settings" class="settings">
+            <label>Estilo dos cortes de live
+              <select id="live-style">
+                <option value="close">Close (gancho + word-pop)</option>
+                <option value="letterbox">Faixas (letterbox)</option>
+                <option value="split">Meia tela</option>
+                <option value="humor">Resenha / meme</option>
+                <option value="storytelling">Storytelling</option>
+              </select>
+            </label>
+            <label>Palavras de impacto (separadas por vírgula)
+              <textarea id="keywords" rows="3"></textarea>
+            </label>
+            <label class="check"><input type="checkbox" id="lives-enabled" checked> Monitoramento ligado</label>
+            <button type="submit" class="btn primary">Salvar ajustes</button>
+          </form>
+        </div>
+        <div class="card">
+          <h2>Canais</h2>
+          <form id="add-channel" class="add">
+            <input type="url" id="channel-url" placeholder="Link do canal (YouTube, Twitch ou TikTok)" required>
+            <input type="text" id="channel-name" placeholder="Nome (opcional)">
+            <button type="submit" class="btn primary">Adicionar</button>
+          </form>
+          <p class="error" id="channel-err" hidden></p>
+          <ul id="channels" class="channels"></ul>
+        </div>
+        <div class="card">
+          <h2>Sessões ao vivo</h2>
+          <div id="sessions" class="sessions"><p class="muted">Nenhuma live sendo gravada.</p></div>
+        </div>
+      </section>
+    </main>
+    <p class="foot">Direto ao Osso · ferramenta interna · custo R$ 0 · aprovação só registra a decisão</p>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

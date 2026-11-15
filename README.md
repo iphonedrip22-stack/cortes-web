@@ -1,0 +1,17 @@
+# Direto ao Osso — esteira de cortes (interface)
+
+Página pública só com o código da interface. **Não tem senha, vídeo, token nem dado da fila neste repositório.**
+
+O site abre no GitHub Pages, o login e a fila ficam num projeto gratuito do Supabase, e o processamento pesado roda no servidor da esteira, que só faz chamadas de saída.
+
+- Aprovar e rejeitar **só registram a decisão**. Nada é publicado nas redes por aqui.
+- A chave que aparece em `js/config.js` é a chave anônima (pública por desenho). A chave de serviço nunca entra neste repositório.
+
+## Depois do setup
+
+1. Abra o endereço do GitHub Pages.
+2. Entre com o e-mail e a senha gerados no servidor (arquivo `site_login.txt`).
+3. Cole o link de um vídeo ou envie um arquivo, escolha o estilo e rode a esteira.
+4. A fila mostra a prévia. Aprovar não publica.
+
+Se a página abrir mas o login ainda não funcionar, o setup do Supabase ainda não terminou.
