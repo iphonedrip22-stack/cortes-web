@@ -164,7 +164,7 @@ a.btn.ghost{color:var(--text)}
 .toast.is-on{display:block}
 @media(min-width:900px){.toast{bottom:24px}}
 .upload-name{font-size:.75rem;color:var(--muted);margin-top:4px}
-.hidden{display:none !important}
+[hidden],.hidden{display:none !important}
 
 /* Single-video modal player */
 .player{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center}
