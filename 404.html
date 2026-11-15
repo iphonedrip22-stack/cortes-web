@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cortes Studio</title>
+  <meta http-equiv="refresh" content="0;url=/cortes-web/">
+</head>
+<body style="font-family:system-ui,sans-serif;background:#0b0d10;color:#f4f5f7;padding:24px">
+  <p>Abrindo o Cortes Studio…</p>
+  <p><a href="/cortes-web/" style="color:#ffd400">Entrar</a></p>
+  <script>
+    (function () {
+      var base = "/cortes-web/";
+      var path = location.pathname || "";
+      if (path.indexOf(base) === 0) path = path.slice(base.length);
+      path = path.replace(/^\/+/, "").replace(/\/+$/, "");
+      var hash = path ? ("#/" + path) : "#/inicio";
+      location.replace(base + hash + (location.search || ""));
+    })();
+  </script>
+</body>
+</html>

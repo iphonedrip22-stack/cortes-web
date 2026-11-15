@@ -81,14 +81,35 @@ function fillProfileSelects(){
   ["#profile-select","#profile-select-m"].forEach(sel => { const el=$(sel); if (el) el.innerHTML = html; });
 }
 
+function parseRoute(){
+  const raw = decodeURIComponent((location.hash || "").replace(/^#\/?/, ""));
+  const parts = raw.split("/").filter(Boolean);
+  const incoming = parts[0] || "inicio";
+  const map = { inicio:"inicio", projetos:"projetos", cortes:"fila", fila:"fila", lives:"lives", perfis:"perfis" };
+  const tab = map[incoming] || "inicio";
+  const rest = parts[1] || "";
+  const focusNew = tab === "projetos" && rest === "novo";
+  const projectId = tab === "projetos" && rest && rest !== "novo" ? rest : null;
+  return { tab, projectId, focusNew };
+}
 function setTab(name){
-  $$(".tab").forEach(x => x.classList.toggle("is-on", x.dataset.tab === name));
-  $$(".panel").forEach(p => p.classList.toggle("is-on", p.id === "tab-"+name));
-  if (name === "fila") loadFila();
-  if (name === "lives") loadLives();
-  if (name === "inicio") renderDashboard();
-  if (name === "perfis") renderProfiles();
-  if (name === "projetos") tickJob();
+  const path = name === "fila" ? "cortes" : name;
+  const h = "#/" + path;
+  if (location.hash === h || location.hash === "#/" + name) applyRoute();
+  else location.hash = h;
+}
+function applyRoute(){
+  const { tab, projectId, focusNew } = parseRoute();
+  $$(".tab").forEach(x => x.classList.toggle("is-on", x.dataset.tab === tab));
+  $$(".panel").forEach(p => p.classList.toggle("is-on", p.id === "tab-"+tab));
+  if (tab === "fila") loadFila();
+  if (tab === "lives") loadLives();
+  if (tab === "inicio") renderDashboard();
+  if (tab === "perfis") renderProfiles();
+  if (tab === "projetos"){
+    tickJob();
+    renderProjects(projectId, focusNew);
+  }
 }
 
 function initClient(){
@@ -155,6 +176,8 @@ function showApp(){
     tickJob();
     renderProfiles();
     subscribe();
+    if (!location.hash) history.replaceState(null, "", "#/inicio");
+    applyRoute();
   });
 }
 function showGate(){ document.body.classList.remove("is-in"); }
@@ -193,8 +216,15 @@ function bindApp(){
   if (appBound) return;
   appBound = true;
   $("#logout-btn").addEventListener("click", () => sb.auth.signOut());
-  $$(".tab").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
-  $$("[data-go]").forEach(b => b.addEventListener("click", () => setTab(b.dataset.go)));
+  window.addEventListener("hashchange", applyRoute);
+  $$(".tab").forEach(b => b.addEventListener("click", ev => {
+    /* anchors already set the hash; still handle leftover buttons */
+    if (b.tagName !== "A") { ev.preventDefault(); setTab(b.dataset.tab); }
+  }));
+  $$("[data-go]").forEach(b => b.addEventListener("click", ev => {
+    ev.preventDefault();
+    setTab(b.dataset.go);
+  }));
   ["#profile-select","#profile-select-m"].forEach(sel => {
     $(sel).addEventListener("change", e => {
       currentProfileId = e.target.value;
@@ -352,6 +382,7 @@ async function loadFila(){
   allCuts = cutsForProfile(cuts || []);
   await renderFila();
   await renderDashboard();
+  if (parseRoute().tab === "projetos") await renderProjects(parseRoute().projectId, parseRoute().focusNew);
 }
 
 async function renderFila(){
@@ -371,11 +402,117 @@ async function renderFila(){
     covers[it.id] = await signedCover(it.cover_path);
   }));
   $("#fila").innerHTML = items.map(it => cardHtml(it, covers[it.id])).join("");
-  $("#fila").querySelectorAll("[data-play]").forEach(b => b.addEventListener("click", () => openPlayer(b.dataset.play)));
-  $("#fila").querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", ev => {
+  bindCutActions($("#fila"));
+}
+
+function bindCutActions(root){
+  if (!root) return;
+  root.querySelectorAll("[data-play]").forEach(b => b.addEventListener("click", () => openPlayer(b.dataset.play)));
+  root.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", ev => {
     ev.stopPropagation();
     decide(b.closest(".cut").dataset.id, b.dataset.act);
   }));
+}
+
+function projectIdOf(it){
+  if (it.video_id) return String(it.video_id);
+  if (it.tag === "live") return "live";
+  return String(it.source || "outros");
+}
+function cleanTitle(t){
+  return String(t||"").replace(/\s+[—–-]\s+(resenha\/meme|meia tela|storytelling|faixas(?:\s*\(motion\))?|letterbox|close)\s*$/i, "").trim();
+}
+function groupProjects(cuts){
+  const map = new Map();
+  for (const c of cuts || []){
+    const id = projectIdOf(c);
+    if (!map.has(id)) map.set(id, []);
+    map.get(id).push(c);
+  }
+  return [...map.entries()].map(([id, items]) => {
+    const first = items[0];
+    const title = cleanTitle(first.title) || first.channel || id;
+    const url = first.source_url && /^https?:/i.test(first.source_url)
+      ? first.source_url
+      : (id && !id.startsWith("live") && id !== "outros" ? "https://youtu.be/"+id : "");
+    return {
+      id,
+      title,
+      short: sourceShort(first),
+      channel: first.channel || "",
+      source_url: url,
+      items,
+      pending: items.filter(i => decisionOf(i.id) === "pending").length,
+      cover: (items.find(i => i.cover_path) || {}).cover_path,
+    };
+  }).sort((a,b) => b.items.length - a.items.length);
+}
+
+async function renderProjects(projectId, focusNew){
+  const listEl = $("#project-list");
+  const detailEl = $("#project-detail");
+  const form = $("#run-form");
+  const job = $("#job-card");
+  if (!listEl || !detailEl) return;
+  const projects = groupProjects(allCuts);
+  if (projectId){
+    const proj = projects.find(p => p.id === projectId);
+    if (!proj){
+      toast("Não encontrei esse projeto.");
+      history.replaceState(null, "", "#/projetos");
+      projectId = null;
+    } else {
+      listEl.hidden = true;
+      detailEl.hidden = false;
+      if (form) form.hidden = true;
+      if (job) job.hidden = true;
+      const hero = $("#project-hero");
+      if (hero){
+        const link = proj.source_url ? ` · <a href="${esc(proj.source_url)}" target="_blank" rel="noopener">vídeo original</a>` : "";
+        hero.innerHTML = `<p class="kicker">${esc(proj.short)}</p>
+          <h2>${esc(proj.title)}</h2>
+          <p class="meta">${proj.items.length} corte${proj.items.length===1?"":"s"} · ${proj.pending} pendente${proj.pending===1?"":"s"}${link}</p>`;
+      }
+      const covers = {};
+      await Promise.all(proj.items.map(async it => { covers[it.id] = await signedCover(it.cover_path); }));
+      const box = $("#project-cuts");
+      if (box){
+        box.innerHTML = proj.items.map(it => cardHtml(it, covers[it.id])).join("");
+        bindCutActions(box);
+      }
+      return;
+    }
+  }
+  listEl.hidden = false;
+  detailEl.hidden = true;
+  if (form) form.hidden = false;
+  if (job) job.hidden = false;
+  const empty = $("#projects-empty");
+  const grid = $("#projects-grid");
+  if (!projects.length){
+    if (empty) empty.hidden = false;
+    if (grid) grid.innerHTML = "";
+  } else {
+    if (empty) empty.hidden = true;
+    const covers = {};
+    await Promise.all(projects.map(async p => { covers[p.id] = await signedCover(p.cover); }));
+    if (grid){
+      grid.innerHTML = projects.map(p => {
+        const thumb = covers[p.id] ? `<img src="${covers[p.id]}" alt="">` : `<span class="ph"></span>`;
+        return `<a class="proj" href="#/projetos/${encodeURIComponent(p.id)}">
+          ${thumb}
+          <div>
+            <h3>${esc(p.short)} · ${esc(p.title)}</h3>
+            <p class="meta">${p.items.length} corte${p.items.length===1?"":"s"} · ${p.pending} pendente${p.pending===1?"":"s"}</p>
+          </div>
+        </a>`;
+      }).join("");
+    }
+  }
+  if (focusNew){
+    const url = $("#url");
+    if (url){ url.scrollIntoView({ block: "center" }); setTimeout(() => url.focus(), 50); }
+  }
 }
 
 function cardHtml(it, coverUrl){
@@ -457,6 +594,7 @@ async function decide(id, act){
   toast(act === "approved" ? "Aprovado (nada foi publicado)." : "Rejeitado.");
   renderFila();
   renderDashboard();
+  if (parseRoute().tab === "projetos") renderProjects(parseRoute().projectId, parseRoute().focusNew);
 }
 function decideCurrent(act){
   if (!playerCut) return;
@@ -568,12 +706,16 @@ async function loadLives(){
   const set = {};
   (settings || []).forEach(s => { set[s.key] = s.value; });
   const p = currentProfile();
-  if (p.live_style) $("#live-style").value = p.live_style;
-  else if (set.style) $("#live-style").value = typeof set.style === "string" ? set.style : "close";
-  if (typeof p.live_enabled === "boolean") $("#lives-enabled").checked = p.live_enabled;
-  else if (typeof set.enabled === "boolean") $("#lives-enabled").checked = set.enabled;
+  if ($("#live-style")){
+    if (p.live_style) $("#live-style").value = p.live_style;
+    else if (set.style) $("#live-style").value = typeof set.style === "string" ? set.style : "close";
+  }
+  if ($("#lives-enabled")){
+    if (typeof p.live_enabled === "boolean") $("#lives-enabled").checked = p.live_enabled;
+    else if (typeof set.enabled === "boolean") $("#lives-enabled").checked = set.enabled;
+  }
   const kw = kwRows.map(w => w.word).join(", ");
-  if (document.activeElement !== $("#keywords")) $("#keywords").value = kw;
+  if ($("#keywords") && document.activeElement !== $("#keywords")) $("#keywords").value = kw;
 
   const ul = $("#channels");
   if (!ch.length) ul.innerHTML = `<li class="muted">Nenhum canal neste perfil.</li>`;

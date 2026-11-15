@@ -87,6 +87,9 @@ textarea{resize:vertical}
 .btn.ok{background:var(--ok);color:var(--ok-ink)}
 .btn.danger{background:var(--danger);color:#fff}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+a.btn,a.tab{text-decoration:none;color:inherit;-webkit-tap-highlight-color:transparent}
+a.btn.primary{color:var(--accent-ink)}
+a.btn.ghost{color:var(--text)}
 
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(min-width:700px){.stats{grid-template-columns:repeat(4,1fr)}}
@@ -175,3 +178,14 @@ textarea{resize:vertical}
 #player-video{width:100%;aspect-ratio:9/16;max-height:62vh;background:#000;display:block;object-fit:contain}
 .player-body{padding:14px 16px 20px}
 .player-x{position:absolute;top:10px;right:10px;z-index:2;background:#000a;color:#fff;border:0;border-radius:999px;padding:6px 10px;font-size:.75rem;font-weight:700;cursor:pointer}
+
+/* Project list */
+.proj-list{display:flex;flex-direction:column;gap:10px}
+a.proj{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;color:inherit;text-decoration:none}
+a.proj:hover{border-color:var(--accent)}
+a.proj img,a.proj .ph{width:48px;height:84px;object-fit:cover;border-radius:8px;background:#000;flex-shrink:0}
+a.proj h3{font-size:.95rem;margin:0 0 4px;font-weight:800}
+a.proj .meta{margin:0}
+#project-back{align-self:flex-start}
+#project-hero h2{margin-top:0}
+#project-hero a{color:var(--accent)}

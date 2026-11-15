@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Cortes Studio</title>
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/app.css?v=20261115p">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -48,11 +48,11 @@
         <select id="profile-select" aria-label="Perfil de cortes"></select>
       </label>
       <nav class="side-nav" role="tablist">
-        <button class="tab is-on" data-tab="inicio">Início</button>
-        <button class="tab" data-tab="projetos">Projetos</button>
-        <button class="tab" data-tab="fila">Cortes</button>
-        <button class="tab" data-tab="lives">Lives</button>
-        <button class="tab" data-tab="perfis">Perfis</button>
+        <a class="tab is-on" href="#/inicio" data-tab="inicio">Início</a>
+        <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
+        <a class="tab" href="#/cortes" data-tab="fila">Cortes</a>
+        <a class="tab" href="#/lives" data-tab="lives">Lives</a>
+        <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
       </nav>
       <p class="sider-note">Nada é publicado por aqui. Aprovar só registra a decisão.</p>
       <button type="button" class="btn ghost sider-out" id="logout-btn">Sair</button>
@@ -77,21 +77,36 @@
             <h2 id="dash-title">Direto ao Osso</h2>
             <p class="muted" id="dash-sub">empreendedorismo · @diretoaosso</p>
             <div class="quick">
-              <button type="button" class="btn primary" data-go="projetos">Novo projeto</button>
-              <button type="button" class="btn ghost" data-go="fila">Ver cortes</button>
+              <a class="btn primary" href="#/projetos/novo">Novo projeto</a>
+              <a class="btn ghost" href="#/cortes">Ver cortes</a>
             </div>
           </div>
           <div class="stats" id="dash-stats"></div>
           <div class="card">
             <div class="fila-head">
               <h2>Pendentes de aprovação</h2>
-              <button type="button" class="btn ghost" data-go="fila">Fila completa</button>
+              <a class="btn ghost" href="#/cortes">Fila completa</a>
             </div>
             <div id="dash-pending" class="mini-list"></div>
           </div>
         </section>
 
         <section id="tab-projetos" class="panel">
+          <div id="project-list">
+            <div class="fila-head">
+              <div>
+                <h2>Projetos</h2>
+                <p class="hint tight">Abra um vídeo para ver os cortes, ou comece um novo abaixo.</p>
+              </div>
+            </div>
+            <div id="projects-grid" class="proj-list"></div>
+            <p class="muted" id="projects-empty" hidden>Nenhum projeto neste perfil ainda.</p>
+          </div>
+          <div id="project-detail" hidden>
+            <a class="btn ghost" href="#/projetos" id="project-back">← Projetos</a>
+            <div class="card" id="project-hero"></div>
+            <div id="project-cuts" class="grid"></div>
+          </div>
           <form id="run-form" class="card run">
             <h2>Novo projeto</h2>
             <p class="hint">Cola o link ou envia o arquivo. A esteira baixa, transcreve, escolhe trechos, edita no estilo do perfil e faz o controle de qualidade. Música desligada. Nada é publicado.</p>
@@ -235,11 +250,11 @@
     </div>
 
     <nav class="dock mobile-only" role="tablist">
-      <button class="tab is-on" data-tab="inicio">Início</button>
-      <button class="tab" data-tab="projetos">Projetos</button>
-      <button class="tab" data-tab="fila">Cortes</button>
-      <button class="tab" data-tab="lives">Lives</button>
-      <button class="tab" data-tab="perfis">Perfis</button>
+      <a class="tab is-on" href="#/inicio" data-tab="inicio">Início</a>
+      <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
+      <a class="tab" href="#/cortes" data-tab="fila">Cortes</a>
+      <a class="tab" href="#/lives" data-tab="lives">Lives</a>
+      <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
     </nav>
   </div>
 
@@ -263,8 +278,8 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js"></script>
+  <script src="js/config.js?v=20261115p"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=20261115p"></script>
 </body>
 </html>
