@@ -4,15 +4,56 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Cortes Studio</title>
-  <link rel="stylesheet" href="css/app.css?v=20261115r">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#0b0d10">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <style>
+    html,body{margin:0;padding:0;background:#0b0d10;color:#f4f5f7;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+      min-height:100%;min-height:100vh}
+    #gate{min-height:100vh;padding:24px;display:block}
+    #login-form{max-width:420px;margin:12vh auto 0;background:#14171c;border:1px solid #2a3038;border-radius:16px;padding:18px}
+    #login-form h1{margin:0 0 4px;font-size:1.35rem}
+    #login-form p{margin:0 0 12px;color:#8b93a1;font-size:.85rem}
+    #login-form label{display:block;margin:0 0 12px;font-size:.8rem;color:#8b93a1}
+    #login-form input{width:100%;box-sizing:border-box;margin-top:6px;background:#0c0e12;color:#f4f5f7;border:1px solid #2a3038;border-radius:10px;padding:11px 12px}
+    #login-btn{border:0;border-radius:999px;padding:11px 16px;font-weight:700;background:#ffd400;color:#111;width:100%;cursor:pointer}
+    #boot-error{display:none;max-width:420px;margin:16px auto;background:#3a1116;color:#ffd0d4;border:1px solid #ff5a6a;border-radius:12px;padding:12px 14px;font-size:.9rem}
+    #boot-error.is-on{display:block}
+    noscript p{max-width:420px;margin:16px auto;color:#ffd400}
+  </style>
+  <link rel="stylesheet" href="css/app.css?v=fixsafari1">
+  <script>
+    (function () {
+      try {
+        if (navigator.serviceWorker) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            for (var i = 0; i < regs.length; i++) regs[i].unregister();
+          });
+        }
+      } catch (e) {}
+    })();
+    window.showBootError = function (msg) {
+      var el = document.getElementById("boot-error");
+      if (!el) return;
+      el.hidden = false;
+      el.className = "is-on";
+      el.textContent = msg || "Não consegui abrir a página. Atualize e tente de novo.";
+      try { document.body.classList.remove("is-in"); } catch (e) {}
+    };
+    window.addEventListener("error", function (ev) {
+      if (document.body && !document.body.classList.contains("is-in")) {
+        var el = document.getElementById("boot-error");
+        if (el && !el.classList.contains("is-on")) {
+          window.showBootError("Erro ao carregar: " + (ev && ev.message ? ev.message : "atualize a página."));
+        }
+      }
+    });
+  </script>
 </head>
 <body>
+  <noscript><p>Ative o JavaScript para entrar no Cortes Studio.</p></noscript>
+  <p id="boot-error" hidden></p>
   <section class="gate" id="gate">
     <form class="card login-card" id="login-form">
       <div class="brand">
@@ -278,8 +319,8 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=20261115r"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script src="js/app.js?v=20261115r"></script>
+  <script src="js/config.js?v=fixsafari1"></script>
+  <script src="js/supabase.umd.js?v=fixsafari1"></script>
+  <script src="js/app.js?v=fixsafari1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
 </body>
 </html>

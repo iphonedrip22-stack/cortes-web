@@ -1,5 +1,17 @@
 /* Cortes Studio — public GitHub Pages frontend. Uses only the anon key. */
 const $ = (s, r=document) => r.querySelector(s);
+
+function storageGet(k){
+  try { return localStorage.getItem(k); } catch (e) { return null; }
+}
+function storageSet(k, v){
+  try { localStorage.setItem(k, v); } catch (e) {}
+}
+function showError(msg){
+  if (window.showBootError) window.showBootError(msg);
+  else try { toast(msg); } catch (e) {}
+}
+
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const STAGES = [
   ["download","Baixando o vídeo"],
@@ -35,7 +47,7 @@ let currentJobId = null;
 let hasProfiles = false;
 let hasProfileCols = false;
 let profiles = [];
-let currentProfileId = localStorage.getItem("cortes.profile") || SEED_PROFILE;
+let currentProfileId = storageGet("cortes.profile") || SEED_PROFILE;
 let allCuts = [];
 let decMap = {};
 let playerCut = null;
@@ -169,7 +181,11 @@ const signedVideo = path => signed(path, signedCache);
 
 function showApp(){
   document.body.classList.add("is-in");
-  bindApp();
+  try { bindApp(); } catch (e) {
+    document.body.classList.remove("is-in");
+    showError("Não consegui abrir o aplicativo. Atualize a página. " + (e && e.message ? e.message : ""));
+    return;
+  }
   detectSchema().then(async () => {
     await loadFila();
     loadLives();
@@ -178,22 +194,35 @@ function showApp(){
     subscribe();
     if (!location.hash) history.replaceState(null, "", "#/inicio");
     applyRoute();
+  }).catch(err => {
+    document.body.classList.remove("is-in");
+    showError("Não consegui carregar seus dados. Atualize a página. " + (err && err.message ? err.message : ""));
   });
 }
 function showGate(){ document.body.classList.remove("is-in"); }
 
 async function boot(){
-  ["login-title","app-title","app-title-m"].forEach(id => { const el=$("#"+id); if (el) el.textContent = appName; });
-  if ($("#login-tag")) $("#login-tag").textContent = appTagline;
-  document.title = appName;
-  sb = initClient();
-  if (!sb) return;
-  const { data } = await sb.auth.getSession();
-  if (data && data.session) showApp();
-  else showGate();
-  sb.auth.onAuthStateChange((_e, session) => { if (session) showApp(); else showGate(); });
+  try {
+    ["login-title","app-title","app-title-m"].forEach(id => { const el=$("#"+id); if (el) el.textContent = appName; });
+    if ($("#login-tag")) $("#login-tag").textContent = appTagline;
+    document.title = appName;
+    sb = initClient();
+    if (!sb){
+      showError("Não carreguei a conexão com o banco. Atualize a página.");
+      showGate();
+      return;
+    }
+    const { data } = await sb.auth.getSession();
+    if (data && data.session) showApp();
+    else showGate();
+    sb.auth.onAuthStateChange((_e, session) => { if (session) showApp(); else showGate(); });
+  } catch (err) {
+    showGate();
+    showError("Não consegui iniciar a página. Atualize e tente de novo. " + (err && err.message ? err.message : ""));
+  }
 }
 
+try {
 $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!sb) return;
@@ -211,6 +240,9 @@ $("#login-form").addEventListener("submit", async (e) => {
       : error.message;
   }
 });
+} catch (err) {
+  showError("Não consegui ligar o login. Atualize a página.");
+}
 
 function bindApp(){
   if (appBound) return;
@@ -228,7 +260,7 @@ function bindApp(){
   ["#profile-select","#profile-select-m"].forEach(sel => {
     $(sel).addEventListener("change", e => {
       currentProfileId = e.target.value;
-      localStorage.setItem("cortes.profile", currentProfileId);
+      storageSet("cortes.profile", currentProfileId);
       applyTheme(currentProfile());
       fillProfileSelects();
       const st = $("#style");
@@ -560,7 +592,7 @@ async function openPlayer(id){
   if (!url){ toast("Não consegui gerar o link da prévia."); return; }
   video.preload = "auto";
   video.src = url;
-  try { await video.play(); } catch { /* autoplay blocked: user can tap play */ }
+  try { await video.play(); } catch (e) { /* autoplay blocked: user can tap play */ }
 }
 
 function closePlayer(){
@@ -649,7 +681,7 @@ function renderProfiles(){
   }).join("");
   $$("#profiles-grid [data-pid]").forEach(b => b.addEventListener("click", () => {
     currentProfileId = b.dataset.pid;
-    localStorage.setItem("cortes.profile", currentProfileId);
+    storageSet("cortes.profile", currentProfileId);
     applyTheme(currentProfile());
     fillProfileSelects();
     loadFila(); loadLives(); renderDashboard(); renderProfiles();
@@ -679,7 +711,7 @@ async function onCreateProfile(e){
   if (error){ $("#pf-err").hidden=false; $("#pf-err").textContent=error.message; return; }
   profiles.push(data);
   currentProfileId = data.id;
-  localStorage.setItem("cortes.profile", currentProfileId);
+  storageSet("cortes.profile", currentProfileId);
   applyTheme(data);
   fillProfileSelects();
   $("#profile-form").reset();
@@ -805,4 +837,4 @@ function subscribe(){
   } catch (e) { /* realtime is optional */ }
 }
 
-boot();
+try { boot(); } catch (err) { showGate(); showError("Não consegui iniciar a página."); }
