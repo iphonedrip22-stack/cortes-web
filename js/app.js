@@ -149,11 +149,10 @@ const signedVideo = path => signed(path, signedCache);
 function showApp(){
   document.body.classList.add("is-in");
   bindApp();
-  detectSchema().then(() => {
-    loadFila();
+  detectSchema().then(async () => {
+    await loadFila();
     loadLives();
     tickJob();
-    renderDashboard();
     renderProfiles();
     subscribe();
   });
@@ -315,6 +314,31 @@ async function tickJob(){
   }
 }
 
+
+function formatName(it){
+  const blob = `${it.title||""} ${it.hook||""}`.toLowerCase();
+  const id = String(it.id||"");
+  const cid = String(it.cut_id||"");
+  if (it.tag === "live" || id.startsWith("live:")) return "Live";
+  if (/resenha|meme|humor/.test(blob) || /n03|n04/.test(cid)) return "Resenha/meme";
+  if (/meia tela|split/.test(blob) || /n01|n02/.test(cid)) return "Meia tela";
+  if (/storytelling/.test(blob) || /n05|n06/.test(cid)) return "Storytelling";
+  if (/faixas|letterbox|motion/.test(blob) || /n07|n08/.test(cid)) return "Faixas (motion)";
+  if (id.startsWith("video01:") || id.includes("KzV6rqI-xso") || id.includes("y5PBmcPzEF4")) return "Close";
+  return "";
+}
+function sourceShort(it){
+  const blob = `${it.title||""} ${it.channel||""} ${it.id||""}`;
+  if (/titto|extremos|KzV6rqI-xso|video01:/i.test(blob)) return "Titto";
+  if (/claude|y5PBmcPzEF4|jogo da ia/i.test(blob)) return "Claude";
+  if (it.tag === "live" || String(it.id||"").startsWith("live:")) return "Live";
+  const ch = (it.channel||"").trim();
+  return ch ? ch.split(/\s+/)[0] : "Corte";
+}
+function cutLabel(it){
+  return [formatName(it), sourceShort(it)].filter(Boolean).join(" · ");
+}
+
 function decisionOf(id){ return (decMap[id] && decMap[id].decision) || "pending"; }
 
 async function loadFila(){
@@ -327,7 +351,7 @@ async function loadFila(){
   (decs || []).forEach(d => { decMap[d.cut_id] = d; });
   allCuts = cutsForProfile(cuts || []);
   await renderFila();
-  renderDashboard();
+  await renderDashboard();
 }
 
 async function renderFila(){
@@ -366,7 +390,7 @@ function cardHtml(it, coverUrl){
     <div class="body">
       <div>${tag} <span class="badge ${badge}">${decLabel}</span> <span class="badge">${esc(it.version||"")}</span></div>
       <h3>${esc(it.hook || "Ver prévia")}</h3>
-      <p class="meta">${esc(it.channel||"")} · corte ${esc(it.cut_id||"")} ${esc(qc)}</p>
+      <p class="meta">${esc(cutLabel(it))}${qc ? " · "+esc(qc) : ""}</p>
       <div class="actions">
         <button class="btn ok" data-act="approved">Aprovar</button>
         <button class="btn danger" data-act="rejected">Rejeitar</button>
@@ -385,7 +409,7 @@ async function openPlayer(id){
   const tag = it.tag === "live" ? `<span class="badge live">live</span>` : "";
   $("#player-badges").innerHTML = `${tag} <span class="badge ${badge}">${decLabel}</span> <span class="badge">${esc(it.version||"")}</span>`;
   $("#player-hook").textContent = it.hook || "Prévia";
-  $("#player-meta").textContent = `${it.channel||""} · ${it.title||""} · corte ${it.cut_id||""}`;
+  $("#player-meta").textContent = [cutLabel(it), it.title||""].filter(Boolean).join(" · ");
   const video = $("#player-video");
   video.pause();
   video.removeAttribute("src");
@@ -439,7 +463,7 @@ function decideCurrent(act){
   decide(playerCut.id, act);
 }
 
-function renderDashboard(){
+async function renderDashboard(){
   const items = allCuts;
   const pending = items.filter(it => decisionOf(it.id) === "pending");
   const approved = items.filter(it => decisionOf(it.id) === "approved");
@@ -455,21 +479,20 @@ function renderDashboard(){
     $("#dash-pending").innerHTML = `<p class="muted">Nada pendente neste perfil.</p>`;
     return;
   }
-  $("#dash-pending").innerHTML = show.map(it => `
-    <div class="mini" data-play="${esc(it.id)}">
-      <span class="ph"></span>
+  const covers = {};
+  await Promise.all(show.map(async it => { covers[it.id] = await signedCover(it.cover_path); }));
+  $("#dash-pending").innerHTML = show.map(it => {
+    const thumb = covers[it.id] ? `<img src="${covers[it.id]}" alt="">` : `<span class="ph"></span>`;
+    return `<div class="mini" data-play="${esc(it.id)}">
+      ${thumb}
       <div>
         <h3>${esc(it.hook || it.cut_id)}</h3>
-        <p class="meta">${esc(it.version||"")} · corte ${esc(it.cut_id||"")}</p>
+        <p class="meta">${esc(cutLabel(it))}</p>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   $$("#dash-pending [data-play]").forEach(el => {
     el.addEventListener("click", () => openPlayer(el.dataset.play));
-    signedCover((allCuts.find(c => c.id === el.dataset.play)||{}).cover_path).then(url => {
-      if (!url) return;
-      const ph = el.querySelector(".ph");
-      if (ph){ const img=document.createElement("img"); img.src=url; img.alt=""; ph.replaceWith(img); }
-    });
   });
 }
 
