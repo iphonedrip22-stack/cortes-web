@@ -1,4 +1,4 @@
-/* Direto ao Osso — public GitHub Pages frontend. Uses only the anon key. */
+/* Cortes Studio — public GitHub Pages frontend. Uses only the anon key. */
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const STAGES = [
@@ -12,11 +12,36 @@ const STAGES = [
   ["auto_fix","Ajustes automáticos"],
   ["queue","Colocando na fila"],
 ];
+const SEED_WORKSPACE = "00000000-0000-4000-8000-000000000001";
+const SEED_PROFILE = "00000000-0000-4000-8000-000000000011";
+const FALLBACK_PROFILE = {
+  id: SEED_PROFILE,
+  workspace_id: SEED_WORKSPACE,
+  name: "Direto ao Osso",
+  handle: "diretoaosso",
+  niche: "empreendedorismo",
+  default_style: "close",
+  theme: { bg: "#0a0a0a", accent: "#ffd400", text: "#111111" },
+  platforms: { instagram: "@diretoaosso", tiktok: "@diretoaosso", youtube: "" },
+};
+
 const cfg = window.CORTES_CONFIG || {};
+const appName = cfg.appName || "Cortes Studio";
+const appTagline = cfg.appTagline || "Cortes para redes, em vários perfis";
 const configured = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
+
 let sb = null;
 let currentJobId = null;
-let signedCache = {}; // path -> {url, exp}
+let hasProfiles = false;
+let hasProfileCols = false;
+let profiles = [];
+let currentProfileId = localStorage.getItem("cortes.profile") || SEED_PROFILE;
+let allCuts = [];
+let decMap = {};
+let playerCut = null;
+let signedCache = {};
+let coverCache = {};
+let appBound = false;
 
 function toast(msg){
   const t = $("#toast");
@@ -28,6 +53,43 @@ function esc(s){
   return String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 }
 function stageLabel(key){ return (STAGES.find(s=>s[0]===key)||[key,key])[1]; }
+function currentProfile(){
+  return profiles.find(p => p.id === currentProfileId) || profiles[0] || FALLBACK_PROFILE;
+}
+
+function applyTheme(p){
+  const theme = p.theme && typeof p.theme === "object" ? p.theme : {};
+  const accent = theme.accent || "#ffd400";
+  const ink = theme.text || "#111111";
+  document.documentElement.style.setProperty("--accent", accent);
+  document.documentElement.style.setProperty("--accent-ink", ink);
+  const initials = (p.name || "CS").split(/\s+/).map(w => w[0]).join("").slice(0,2).toUpperCase();
+  ["login-mark","app-mark","app-mark-m"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = initials || "CS"; });
+  const title = appName;
+  document.title = `${p.name} · ${title}`;
+  ["login-title","app-title","app-title-m"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = title; });
+  if ($("#login-tag")) $("#login-tag").textContent = appTagline;
+  if ($("#app-tag")) $("#app-tag").textContent = p.name;
+  if ($("#profile-label-m")) $("#profile-label-m").textContent = p.handle ? `@${p.handle.replace(/^@/,"")}` : (p.niche || "");
+  if ($("#dash-kicker")) $("#dash-kicker").textContent = p.niche || "Perfil";
+  if ($("#dash-title")) $("#dash-title").textContent = p.name;
+  if ($("#dash-sub")) $("#dash-sub").textContent = [p.niche, p.handle ? `@${p.handle.replace(/^@/,"")}` : ""].filter(Boolean).join(" · ");
+}
+
+function fillProfileSelects(){
+  const html = profiles.map(p => `<option value="${esc(p.id)}" ${p.id===currentProfileId?"selected":""}>${esc(p.name)}</option>`).join("");
+  ["#profile-select","#profile-select-m"].forEach(sel => { const el=$(sel); if (el) el.innerHTML = html; });
+}
+
+function setTab(name){
+  $$(".tab").forEach(x => x.classList.toggle("is-on", x.dataset.tab === name));
+  $$(".panel").forEach(p => p.classList.toggle("is-on", p.id === "tab-"+name));
+  if (name === "fila") loadFila();
+  if (name === "lives") loadLives();
+  if (name === "inicio") renderDashboard();
+  if (name === "perfis") renderProfiles();
+  if (name === "projetos") tickJob();
+}
 
 function initClient(){
   if (!configured){
@@ -45,39 +107,69 @@ function initClient(){
   });
 }
 
-async function signed(path, isVideo){
+async function detectSchema(){
+  hasProfiles = false;
+  hasProfileCols = false;
+  const { data, error } = await sb.from("profiles").select("*").order("created_at", { ascending: true });
+  if (!error){
+    hasProfiles = true;
+    profiles = data && data.length ? data : [FALLBACK_PROFILE];
+    if (currentProfileId && !profiles.some(p => p.id === currentProfileId)) currentProfileId = profiles[0].id;
+  } else {
+    profiles = [FALLBACK_PROFILE];
+    currentProfileId = FALLBACK_PROFILE.id;
+  }
+  const probe = await sb.from("cuts").select("id,profile_id").limit(1);
+  hasProfileCols = !probe.error;
+  fillProfileSelects();
+  applyTheme(currentProfile());
+  const st = $("#style");
+  if (st && currentProfile().default_style) st.value = currentProfile().default_style;
+}
+
+function cutsForProfile(list){
+  if (!hasProfileCols) return list;
+  const pid = currentProfile().id;
+  return (list || []).filter(c => !c.profile_id || c.profile_id === pid);
+}
+
+async function signed(path, cache){
   if (!path) return null;
   const now = Date.now();
-  const hit = signedCache[path];
+  const hit = cache[path];
   if (hit && hit.exp > now + 15_000) return hit.url;
   const { data, error } = await sb.storage.from("previews").createSignedUrl(path, 3600);
   if (error || !data || !data.signedUrl) return null;
-  signedCache[path] = { url: data.signedUrl, exp: now + 50*60*1000 };
+  cache[path] = { url: data.signedUrl, exp: now + 50*60*1000 };
   return data.signedUrl;
 }
+const signedCover = path => signed(path, coverCache);
+const signedVideo = path => signed(path, signedCache);
 
 function showApp(){
   document.body.classList.add("is-in");
   bindApp();
-  tickJob();
-  loadFila();
-  loadLives();
-  subscribe();
+  detectSchema().then(() => {
+    loadFila();
+    loadLives();
+    tickJob();
+    renderDashboard();
+    renderProfiles();
+    subscribe();
+  });
 }
-function showGate(){
-  document.body.classList.remove("is-in");
-}
+function showGate(){ document.body.classList.remove("is-in"); }
 
 async function boot(){
+  ["login-title","app-title","app-title-m"].forEach(id => { const el=$("#"+id); if (el) el.textContent = appName; });
+  if ($("#login-tag")) $("#login-tag").textContent = appTagline;
+  document.title = appName;
   sb = initClient();
   if (!sb) return;
   const { data } = await sb.auth.getSession();
   if (data && data.session) showApp();
   else showGate();
-  sb.auth.onAuthStateChange((_e, session) => {
-    if (session) showApp();
-    else showGate();
-  });
+  sb.auth.onAuthStateChange((_e, session) => { if (session) showApp(); else showGate(); });
 }
 
 $("#login-form").addEventListener("submit", async (e) => {
@@ -98,17 +190,23 @@ $("#login-form").addEventListener("submit", async (e) => {
   }
 });
 
-let appBound = false;
 function bindApp(){
   if (appBound) return;
   appBound = true;
   $("#logout-btn").addEventListener("click", () => sb.auth.signOut());
-  $$(".tab").forEach(b => b.addEventListener("click", () => {
-    $$(".tab").forEach(x => x.classList.toggle("is-on", x===b));
-    $$(".panel").forEach(p => p.classList.toggle("is-on", p.id === "tab-"+b.dataset.tab));
-    if (b.dataset.tab === "fila") loadFila();
-    if (b.dataset.tab === "lives") loadLives();
-  }));
+  $$(".tab").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  $$("[data-go]").forEach(b => b.addEventListener("click", () => setTab(b.dataset.go)));
+  ["#profile-select","#profile-select-m"].forEach(sel => {
+    $(sel).addEventListener("change", e => {
+      currentProfileId = e.target.value;
+      localStorage.setItem("cortes.profile", currentProfileId);
+      applyTheme(currentProfile());
+      fillProfileSelects();
+      const st = $("#style");
+      if (st && currentProfile().default_style) st.value = currentProfile().default_style;
+      loadFila(); loadLives(); renderDashboard(); renderProfiles();
+    });
+  });
   $("#file").addEventListener("change", () => {
     const f = $("#file").files[0];
     $("#file-name").textContent = f ? `${f.name} (${(f.size/1048576).toFixed(1)} MB)` : "";
@@ -116,8 +214,15 @@ function bindApp(){
   $("#run-form").addEventListener("submit", onRun);
   $("#cancel-btn").addEventListener("click", onCancel);
   $("#reload-fila").addEventListener("click", loadFila);
+  $("#fila-filter").addEventListener("change", () => renderFila());
   $("#add-channel").addEventListener("submit", onAddChannel);
   $("#lives-settings").addEventListener("submit", onSaveSettings);
+  $("#profile-form").addEventListener("submit", onCreateProfile);
+  $("#player-close").addEventListener("click", closePlayer);
+  $("#player-close-bg").addEventListener("click", closePlayer);
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape") closePlayer(); });
+  $("#player-approve").addEventListener("click", () => decideCurrent("approved"));
+  $("#player-reject").addEventListener("click", () => decideCurrent("rejected"));
 }
 
 async function onRun(e){
@@ -142,13 +247,18 @@ async function onRun(e){
       });
       if (error) throw error;
     }
-    const { data, error } = await sb.from("jobs").insert({
+    const row = {
       status: "queued",
       url: url || null,
       storage_path,
       style,
       source: file ? "upload" : "url",
-    }).select("id").single();
+    };
+    if (hasProfileCols){
+      row.profile_id = currentProfile().id;
+      row.workspace_id = currentProfile().workspace_id || SEED_WORKSPACE;
+    }
+    const { data, error } = await sb.from("jobs").insert(row).select("id").single();
     if (error) throw error;
     currentJobId = data.id;
     toast("Esteira na fila. O servidor vai pegar em instantes.");
@@ -177,12 +287,13 @@ function renderStages(stages){
 }
 
 async function tickJob(){
-  const { data, error } = await sb.from("jobs").select("*").order("created_at", { ascending: false }).limit(8);
-  if (error){ return; }
-  const jobs = data || [];
-  const job = jobs.find(j => j.id === currentJobId) || jobs.find(j => ["queued","running"].includes(j.status)) || jobs[0];
-  if (!job || (job.status === "done" && !currentJobId && jobs.every(j => !["queued","running"].includes(j.status)) && job !== jobs[0] /* keep last visible */)) {
-    /* show most recent if nothing running */
+  const q = sb.from("jobs").select("*").order("created_at", { ascending: false }).limit(12);
+  const { data, error } = await q;
+  if (error) return;
+  let jobs = data || [];
+  if (hasProfileCols){
+    const pid = currentProfile().id;
+    jobs = jobs.filter(j => !j.profile_id || j.profile_id === pid);
   }
   const show = jobs.find(j => ["queued","running"].includes(j.status)) || (currentJobId && jobs.find(j => j.id === currentJobId)) || null;
   if (!show){
@@ -204,133 +315,269 @@ async function tickJob(){
   }
 }
 
+function decisionOf(id){ return (decMap[id] && decMap[id].decision) || "pending"; }
+
 async function loadFila(){
-  const [{ data: cuts, error: e1 }, { data: decs, error: e2 }] = await Promise.all([
+  const [{ data: cuts, error: e1 }, { data: decs }] = await Promise.all([
     sb.from("cuts").select("*").order("mtime", { ascending: false, nullsFirst: false }),
     sb.from("decisions").select("*"),
   ]);
   if (e1){ $("#fila").innerHTML = `<p class="error">${esc(e1.message)}</p>`; return; }
-  const decMap = {};
+  decMap = {};
   (decs || []).forEach(d => { decMap[d.cut_id] = d; });
-  const items = cuts || [];
+  allCuts = cutsForProfile(cuts || []);
+  await renderFila();
+  renderDashboard();
+}
+
+async function renderFila(){
+  const filter = ($("#fila-filter") && $("#fila-filter").value) || "pending";
+  let items = allCuts.slice();
+  if (filter === "pending") items = items.filter(it => decisionOf(it.id) === "pending");
+  else if (filter === "approved") items = items.filter(it => decisionOf(it.id) === "approved");
+  else if (filter === "rejected") items = items.filter(it => decisionOf(it.id) === "rejected");
+  else if (filter === "live") items = items.filter(it => it.tag === "live");
   if (!items.length){
-    $("#fila").innerHTML = `<p class="muted">Nenhum corte na fila ainda. Quando o servidor sincronizar, eles aparecem aqui.</p>`;
+    $("#fila").innerHTML = `<p class="muted">Nenhum corte nesta vista. Se a fila estiver vazia, o servidor ainda está sincronizando.</p>`;
     return;
   }
-  const cards = await Promise.all(items.map(async it => {
-    const decision = (decMap[it.id] && decMap[it.id].decision) || "pending";
-    const badge = decision==="approved" ? "ok" : decision==="rejected" ? "no" : "pending";
-    const decLabel = decision==="approved" ? "aprovado" : decision==="rejected" ? "rejeitado" : "pendente";
-    const qc = it.qc && it.qc.score != null ? `QC ${it.qc.score}` : (it.qc && it.qc.pass === true ? "QC ok" : "");
-    const tag = it.tag === "live" ? `<span class="badge live">live</span>` : "";
-    const liveTs = it.live_timestamp ? ` · ao vivo ${it.live_timestamp}` : "";
-    const reason = it.reason ? `<p class="meta">${esc(it.reason)}</p>` : "";
-    const [videoUrl, coverUrl] = await Promise.all([signed(it.preview_path), signed(it.cover_path)]);
-    const media = videoUrl
-      ? `<video controls preload="metadata" poster="${coverUrl||""}" src="${videoUrl}" playsinline></video>`
-      : (coverUrl ? `<img class="cover" src="${coverUrl}" alt="">` : "");
-    return `<article class="cut" data-id="${esc(it.id)}">
-      ${media}
-      <div class="body">
-        <div>${tag} <span class="badge ${badge}">${decLabel}</span> <span class="badge">${esc(it.version||"")}</span></div>
-        <h3>${esc(it.hook || "Ver prévia do vídeo")}</h3>
-        <p class="meta">${esc(it.channel||"")} · ${esc(it.title||"")} · corte ${esc(it.cut_id||"")} ${esc(qc)}${esc(liveTs)}</p>
-        ${reason}
-        <div class="actions">
-          <button class="btn ok" data-act="approved">Aprovar</button>
-          <button class="btn danger" data-act="rejected">Rejeitar</button>
-        </div>
+  // Sign covers only — never attach a video src in the list.
+  const covers = {};
+  await Promise.all(items.map(async it => {
+    covers[it.id] = await signedCover(it.cover_path);
+  }));
+  $("#fila").innerHTML = items.map(it => cardHtml(it, covers[it.id])).join("");
+  $("#fila").querySelectorAll("[data-play]").forEach(b => b.addEventListener("click", () => openPlayer(b.dataset.play)));
+  $("#fila").querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", ev => {
+    ev.stopPropagation();
+    decide(b.closest(".cut").dataset.id, b.dataset.act);
+  }));
+}
+
+function cardHtml(it, coverUrl){
+  const decision = decisionOf(it.id);
+  const badge = decision==="approved" ? "ok" : decision==="rejected" ? "no" : "pending";
+  const decLabel = decision==="approved" ? "aprovado" : decision==="rejected" ? "rejeitado" : "pendente";
+  const qc = it.qc && it.qc.score != null ? `QC ${it.qc.score}` : (it.qc && it.qc.pass === true ? "QC ok" : "");
+  const tag = it.tag === "live" ? `<span class="badge live">live</span>` : "";
+  const bg = coverUrl ? `style="background-image:url('${coverUrl}')"` : "";
+  return `<article class="cut" data-id="${esc(it.id)}">
+    <button type="button" class="thumb" data-play="${esc(it.id)}" ${bg} aria-label="Assistir corte"></button>
+    <div class="body">
+      <div>${tag} <span class="badge ${badge}">${decLabel}</span> <span class="badge">${esc(it.version||"")}</span></div>
+      <h3>${esc(it.hook || "Ver prévia")}</h3>
+      <p class="meta">${esc(it.channel||"")} · corte ${esc(it.cut_id||"")} ${esc(qc)}</p>
+      <div class="actions">
+        <button class="btn ok" data-act="approved">Aprovar</button>
+        <button class="btn danger" data-act="rejected">Rejeitar</button>
       </div>
-    </article>`;
-  }));
-  $("#fila").innerHTML = cards.join("");
-  $("#fila").querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", async () => {
-    const id = b.closest(".cut").dataset.id;
-    const item = items.find(x => x.id === id) || {};
-    b.disabled = true;
-    const { error } = await sb.from("decisions").upsert({
-      cut_id: id,
-      decision: b.dataset.act,
-      at: new Date().toISOString(),
-      hook: item.hook,
-      version: item.version,
-      source: item.source,
-      tag: item.tag,
+    </div>
+  </article>`;
+}
+
+async function openPlayer(id){
+  const it = allCuts.find(x => x.id === id);
+  if (!it) return;
+  playerCut = it;
+  const decision = decisionOf(id);
+  const badge = decision==="approved" ? "ok" : decision==="rejected" ? "no" : "pending";
+  const decLabel = decision==="approved" ? "aprovado" : decision==="rejected" ? "rejeitado" : "pendente";
+  const tag = it.tag === "live" ? `<span class="badge live">live</span>` : "";
+  $("#player-badges").innerHTML = `${tag} <span class="badge ${badge}">${decLabel}</span> <span class="badge">${esc(it.version||"")}</span>`;
+  $("#player-hook").textContent = it.hook || "Prévia";
+  $("#player-meta").textContent = `${it.channel||""} · ${it.title||""} · corte ${it.cut_id||""}`;
+  const video = $("#player-video");
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+  const poster = await signedCover(it.cover_path);
+  if (poster) video.poster = poster;
+  else video.removeAttribute("poster");
+  $("#player").hidden = false;
+  document.body.style.overflow = "hidden";
+  const url = await signedVideo(it.preview_path);
+  if (!url){ toast("Não consegui gerar o link da prévia."); return; }
+  video.preload = "auto";
+  video.src = url;
+  try { await video.play(); } catch { /* autoplay blocked: user can tap play */ }
+}
+
+function closePlayer(){
+  const video = $("#player-video");
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+  $("#player").hidden = true;
+  document.body.style.overflow = "";
+  playerCut = null;
+}
+
+async function decide(id, act){
+  const item = allCuts.find(x => x.id === id) || {};
+  const row = {
+    cut_id: id,
+    decision: act,
+    at: new Date().toISOString(),
+    hook: item.hook,
+    version: item.version,
+    source: item.source,
+    tag: item.tag,
+  };
+  if (hasProfileCols){
+    row.profile_id = currentProfile().id;
+    row.workspace_id = currentProfile().workspace_id || SEED_WORKSPACE;
+  }
+  const { error } = await sb.from("decisions").upsert(row);
+  if (error){ toast(error.message); return; }
+  decMap[id] = { cut_id: id, decision: act };
+  toast(act === "approved" ? "Aprovado (nada foi publicado)." : "Rejeitado.");
+  renderFila();
+  renderDashboard();
+}
+function decideCurrent(act){
+  if (!playerCut) return;
+  decide(playerCut.id, act);
+}
+
+function renderDashboard(){
+  const items = allCuts;
+  const pending = items.filter(it => decisionOf(it.id) === "pending");
+  const approved = items.filter(it => decisionOf(it.id) === "approved");
+  const live = items.filter(it => it.tag === "live");
+  $("#dash-stats").innerHTML = [
+    [items.length, "Cortes no perfil"],
+    [pending.length, "Pendentes"],
+    [approved.length, "Aprovados"],
+    [live.length, "Cortes de live"],
+  ].map(([n,l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
+  const show = pending.slice(0, 5);
+  if (!show.length){
+    $("#dash-pending").innerHTML = `<p class="muted">Nada pendente neste perfil.</p>`;
+    return;
+  }
+  $("#dash-pending").innerHTML = show.map(it => `
+    <div class="mini" data-play="${esc(it.id)}">
+      <span class="ph"></span>
+      <div>
+        <h3>${esc(it.hook || it.cut_id)}</h3>
+        <p class="meta">${esc(it.version||"")} · corte ${esc(it.cut_id||"")}</p>
+      </div>
+    </div>`).join("");
+  $$("#dash-pending [data-play]").forEach(el => {
+    el.addEventListener("click", () => openPlayer(el.dataset.play));
+    signedCover((allCuts.find(c => c.id === el.dataset.play)||{}).cover_path).then(url => {
+      if (!url) return;
+      const ph = el.querySelector(".ph");
+      if (ph){ const img=document.createElement("img"); img.src=url; img.alt=""; ph.replaceWith(img); }
     });
-    if (error) toast(error.message);
-    loadFila();
+  });
+}
+
+function renderProfiles(){
+  const box = $("#profiles-migrate");
+  const form = $("#profile-form");
+  if (box) box.hidden = hasProfiles;
+  if (form) form.hidden = !hasProfiles;
+  $("#profiles-grid").innerHTML = profiles.map(p => {
+    const theme = p.theme && typeof p.theme === "object" ? p.theme : {};
+    const on = p.id === currentProfile().id ? " is-on" : "";
+    return `<button type="button" class="profile-card${on}" data-pid="${esc(p.id)}">
+      <h3><span class="swatch" style="background:${esc(theme.accent||"#ffd400")}"></span>${esc(p.name)}</h3>
+      <p class="meta">${esc(p.handle ? "@"+p.handle.replace(/^@/,"") : "")} · ${esc(p.niche||"")} · ${esc(p.default_style||"")}</p>
+    </button>`;
+  }).join("");
+  $$("#profiles-grid [data-pid]").forEach(b => b.addEventListener("click", () => {
+    currentProfileId = b.dataset.pid;
+    localStorage.setItem("cortes.profile", currentProfileId);
+    applyTheme(currentProfile());
+    fillProfileSelects();
+    loadFila(); loadLives(); renderDashboard(); renderProfiles();
   }));
+}
+
+async function onCreateProfile(e){
+  e.preventDefault();
+  $("#pf-err").hidden = true;
+  if (!hasProfiles){ toast("Cole o SQL de perfis no Supabase para criar o segundo perfil."); return; }
+  const handle = ($("#pf-handle").value || "").replace(/^@/, "").trim();
+  const row = {
+    workspace_id: currentProfile().workspace_id || SEED_WORKSPACE,
+    name: $("#pf-name").value.trim(),
+    handle: handle || null,
+    niche: $("#pf-niche").value.trim() || null,
+    default_style: $("#pf-style").value,
+    theme: { bg: "#0b0d10", accent: $("#pf-accent").value || "#ffd400", text: "#111111" },
+    platforms: {
+      instagram: $("#pf-ig").value.trim(),
+      tiktok: $("#pf-tt").value.trim(),
+      youtube: $("#pf-yt").value.trim(),
+    },
+  };
+  if (!row.name){ $("#pf-err").hidden=false; $("#pf-err").textContent="Dá um nome ao perfil."; return; }
+  const { data, error } = await sb.from("profiles").insert(row).select("*").single();
+  if (error){ $("#pf-err").hidden=false; $("#pf-err").textContent=error.message; return; }
+  profiles.push(data);
+  currentProfileId = data.id;
+  localStorage.setItem("cortes.profile", currentProfileId);
+  applyTheme(data);
+  fillProfileSelects();
+  $("#profile-form").reset();
+  toast("Perfil criado. A fila dele começa vazia.");
+  renderProfiles(); renderDashboard(); loadFila();
 }
 
 async function loadLives(){
   const [{ data: channels }, { data: sessions }, { data: words }, { data: settings }] = await Promise.all([
     sb.from("lives_watchlist").select("*").order("added_at", { ascending: true }),
     sb.from("live_sessions").select("*").order("updated_at", { ascending: false }).limit(8),
-    sb.from("keywords").select("word").order("word"),
+    sb.from("keywords").select("*").order("word"),
     sb.from("app_settings").select("*"),
   ]);
+  let ch = channels || [];
+  let sess = sessions || [];
+  let kwRows = words || [];
+  if (hasProfileCols){
+    const pid = currentProfile().id;
+    ch = ch.filter(c => !c.profile_id || c.profile_id === pid);
+    sess = sess.filter(s => !s.profile_id || s.profile_id === pid);
+    kwRows = kwRows.filter(w => !w.profile_id || w.profile_id === pid);
+  }
   const set = {};
   (settings || []).forEach(s => { set[s.key] = s.value; });
-  if (set.style) $("#live-style").value = set.style;
-  if (typeof set.enabled === "boolean") $("#lives-enabled").checked = set.enabled;
-  else if (set.enabled && typeof set.enabled.enabled === "boolean") $("#lives-enabled").checked = set.enabled.enabled;
-  const kw = (words || []).map(w => w.word).join(", ");
+  const p = currentProfile();
+  if (p.live_style) $("#live-style").value = p.live_style;
+  else if (set.style) $("#live-style").value = typeof set.style === "string" ? set.style : "close";
+  if (typeof p.live_enabled === "boolean") $("#lives-enabled").checked = p.live_enabled;
+  else if (typeof set.enabled === "boolean") $("#lives-enabled").checked = set.enabled;
+  const kw = kwRows.map(w => w.word).join(", ");
   if (document.activeElement !== $("#keywords")) $("#keywords").value = kw;
 
   const ul = $("#channels");
-  const sessByCh = {};
-  (sessions || []).forEach(s => {
-    if (["recording","starting","detecting"].includes(s.status)) sessByCh[s.channel_id] = s;
-  });
-  ul.innerHTML = (channels || []).map(c => {
-    const live = sessByCh[c.id] ? `<span class="badge live">ao vivo</span>` : "";
-    const plat = c.platform || "youtube";
-    const exp = c.experimental ? " · experimental" : "";
-    const err = c.last_error ? `<p class="error">${esc(c.last_error)}</p>` : "";
-    const check = c.last_check ? `última checagem: ${c.last_check}` : "ainda não verificado";
-    return `<li data-id="${esc(c.id)}">
-      <div class="name"><strong>${esc(c.name)}</strong> ${live}
-        <span>${c.enabled===false?"pausado":"ativo"}</span></div>
-      <p class="meta">${esc(plat)}${exp} · ${esc(c.handle||c.channel_id||"")}</p>
-      <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.url)}</a>
-      <p class="meta">${esc(check)}</p>
-      ${c.note? `<p class="meta">${esc(c.note)}</p>`:""}
-      ${err}
-      <div class="row">
-        <button class="btn ghost" data-act="toggle">${c.enabled===false?"Ligar":"Pausar"}</button>
-        <button class="btn danger" data-act="remove">Remover</button>
-      </div>
-    </li>`;
-  }).join("") || `<p class="muted">Nenhum canal na lista.</p>`;
-  ul.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", async () => {
-    const id = b.closest("li").dataset.id;
-    const c = (channels || []).find(x => x.id === id);
-    if (b.dataset.act === "remove"){
-      if (!confirm("Remover este canal da lista?")) return;
-      await sb.from("lives_watchlist").delete().eq("id", id);
-    } else {
-      await sb.from("lives_watchlist").update({ enabled: !(c && c.enabled) }).eq("id", id);
-    }
-    loadLives();
-  }));
+  if (!ch.length) ul.innerHTML = `<li class="muted">Nenhum canal neste perfil.</li>`;
+  else ul.innerHTML = ch.map(c => `<li>
+    <div class="name"><strong>${esc(c.name||c.handle||c.id)}</strong>
+      <span>${c.enabled===false?"pausado":"ligado"}</span></div>
+    <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.url)}</a>
+    <div class="actions">
+      <button class="btn ghost" data-ch="${esc(c.id)}" data-op="toggle">${c.enabled===false?"Ligar":"Pausar"}</button>
+      <button class="btn danger" data-ch="${esc(c.id)}" data-op="del">Remover</button>
+    </div>
+  </li>`).join("");
+  ul.querySelectorAll("button[data-ch]").forEach(b => b.addEventListener("click", () => onChannelOp(b.dataset.ch, b.dataset.op)));
 
   const box = $("#sessions");
-  const list = sessions || [];
-  const active = list.filter(s => ["recording","starting","detecting","stopping"].includes(s.status));
-  const show = active.length ? active : list.slice(0, 5);
-  if (!show.length){
-    box.innerHTML = `<p class="muted">Nenhuma live sendo gravada.</p>`;
-  } else {
-    box.innerHTML = show.map(s => {
-      const moments = (s.moments || []).slice(-5).map(m => `<p class="moment">${esc(m.why||m.kind)} · ${esc(m.quote||"")}</p>`).join("");
-      const ncuts = (s.cuts || []).length ? `${(s.cuts||[]).length} corte(s) na fila` : "ainda sem cortes";
-      return `<div class="session">
-        <div class="name"><strong>${esc(s.channel_name||"")}</strong> <span class="badge ${s.status==="recording"?"live":"pending"}">${esc(s.status||"")}</span></div>
-        <p class="meta">${esc(s.title||"")} · ${s.chunks||0} trecho(s) transcritos · ${esc(ncuts)}</p>
-        ${moments}
-      </div>`;
-    }).join("");
+  if (!sess.length) box.innerHTML = `<p class="muted">Nenhuma live sendo gravada.</p>`;
+  else box.innerHTML = sess.map(s => `<div class="session"><strong>${esc(s.title||s.channel_name||s.id)}</strong>
+    <p class="meta">${esc(s.status||"")} · ${esc(s.platform||"")}</p></div>`).join("");
+}
+
+async function onChannelOp(id, op){
+  if (op === "del") await sb.from("lives_watchlist").delete().eq("id", id);
+  else {
+    const { data } = await sb.from("lives_watchlist").select("enabled").eq("id", id).single();
+    await sb.from("lives_watchlist").update({ enabled: !(data && data.enabled) }).eq("id", id);
   }
+  loadLives();
 }
 
 async function onAddChannel(e){
@@ -338,65 +585,59 @@ async function onAddChannel(e){
   $("#channel-err").hidden = true;
   const url = $("#channel-url").value.trim();
   const name = $("#channel-name").value.trim();
-  if (/instagram\.com/i.test(url)){
-    $("#channel-err").hidden = false;
-    $("#channel-err").textContent = "Instagram Live está fora de escopo (precisa de login).";
-    return;
+  if (!url) return;
+  const id = "ch-" + Math.random().toString(36).slice(2, 10);
+  const row = { id, name: name || url, url, platform: /twitch/i.test(url) ? "twitch" : /tiktok/i.test(url) ? "tiktok" : "youtube", enabled: true };
+  if (hasProfileCols){
+    row.profile_id = currentProfile().id;
+    row.workspace_id = currentProfile().workspace_id || SEED_WORKSPACE;
   }
-  let platform = "youtube";
-  if (/twitch\.tv/i.test(url)) platform = "twitch";
-  if (/tiktok\.com/i.test(url)) platform = "tiktok";
-  const id = (name || url).toLowerCase().replace(/https?:\/\//,"").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").slice(0,40) || ("canal-"+Date.now());
-  const { error } = await sb.from("lives_watchlist").insert({
-    id, name: name || id, platform, url, enabled: true, seed: false,
-    experimental: platform === "tiktok",
-    note: platform === "tiktok" ? "TikTok Live é experimental (melhor esforço)." : "",
-    added_at: new Date().toISOString(),
-  });
-  if (error){
-    $("#channel-err").hidden = false;
-    $("#channel-err").textContent = error.message;
-    return;
-  }
-  $("#channel-url").value = "";
-  $("#channel-name").value = "";
+  const { error } = await sb.from("lives_watchlist").insert(row);
+  if (error){ $("#channel-err").hidden=false; $("#channel-err").textContent=error.message; return; }
+  $("#channel-url").value = ""; $("#channel-name").value = "";
   loadLives();
 }
 
 async function onSaveSettings(e){
   e.preventDefault();
-  const words = $("#keywords").value.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
-  const { data: existing } = await sb.from("keywords").select("id,word");
-  const have = new Set((existing||[]).map(x => x.word));
-  const want = new Set(words);
-  const toDel = (existing||[]).filter(x => !want.has(x.word)).map(x => x.id);
-  const toAdd = words.filter(w => !have.has(w)).map(word => ({ word }));
-  if (toDel.length) await sb.from("keywords").delete().in("id", toDel);
+  const style = $("#live-style").value;
+  const enabled = $("#lives-enabled").checked;
+  const words = $("#keywords").value.split(",").map(s => s.trim()).filter(Boolean);
+  if (hasProfiles){
+    await sb.from("profiles").update({ live_style: style, live_enabled: enabled }).eq("id", currentProfile().id);
+    const p = currentProfile();
+    p.live_style = style; p.live_enabled = enabled;
+  } else {
+    await sb.from("app_settings").upsert({ key: "style", value: style });
+    await sb.from("app_settings").upsert({ key: "enabled", value: enabled });
+  }
+  const { data: existing } = await sb.from("keywords").select("*");
+  let rows = existing || [];
+  if (hasProfileCols) rows = rows.filter(r => !r.profile_id || r.profile_id === currentProfile().id);
+  const have = new Set(rows.map(r => (r.word||"").toLowerCase()));
+  const want = new Set(words.map(w => w.toLowerCase()));
+  for (const r of rows){
+    if (!want.has((r.word||"").toLowerCase())) await sb.from("keywords").delete().eq("id", r.id);
+  }
+  const toAdd = words.filter(w => !have.has(w.toLowerCase())).map(word => {
+    const row = { word };
+    if (hasProfileCols){ row.profile_id = currentProfile().id; row.workspace_id = currentProfile().workspace_id || SEED_WORKSPACE; }
+    return row;
+  });
   if (toAdd.length) await sb.from("keywords").insert(toAdd);
-  await sb.from("app_settings").upsert([
-    { key: "style", value: $("#live-style").value },
-    { key: "enabled", value: $("#lives-enabled").checked },
-  ]);
-  toast("Ajustes salvos. O servidor aplica na próxima sincronização.");
+  toast("Ajustes de live salvos.");
 }
 
 function subscribe(){
-  const ch = sb.channel("cortes-live")
-    .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => tickJob())
-    .on("postgres_changes", { event: "*", schema: "public", table: "cuts" }, () => loadFila())
-    .on("postgres_changes", { event: "*", schema: "public", table: "decisions" }, () => loadFila())
-    .on("postgres_changes", { event: "*", schema: "public", table: "live_sessions" }, () => {
-      if ($("#tab-lives").classList.contains("is-on")) loadLives();
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "lives_watchlist" }, () => {
-      if ($("#tab-lives").classList.contains("is-on")) loadLives();
-    })
-    .subscribe();
-  setInterval(() => {
-    tickJob();
-    if ($("#tab-fila").classList.contains("is-on")) loadFila();
-    if ($("#tab-lives").classList.contains("is-on")) loadLives();
-  }, 8000);
+  try {
+    sb.channel("cortes-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "cuts" }, () => loadFila())
+      .on("postgres_changes", { event: "*", schema: "public", table: "decisions" }, () => loadFila())
+      .on("postgres_changes", { event: "*", schema: "public", table: "jobs" }, () => tickJob())
+      .on("postgres_changes", { event: "*", schema: "public", table: "lives_watchlist" }, () => loadLives())
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => detectSchema())
+      .subscribe();
+  } catch (e) { /* realtime is optional */ }
 }
 
 boot();

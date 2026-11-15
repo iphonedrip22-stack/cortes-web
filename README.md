@@ -15,3 +15,7 @@ O site abre no GitHub Pages, o login e a fila ficam num projeto gratuito do Supa
 4. A fila mostra a prévia. Aprovar não publica.
 
 Se a página abrir mas o login ainda não funcionar, o setup do Supabase ainda não terminou.
+
+## Perfis (segundo SQL)
+
+Depois da migration inicial, cole também `sql/migration_profiles.sql` no SQL Editor para liberar vários perfis de cortes. A página funciona antes e depois desse passo.
