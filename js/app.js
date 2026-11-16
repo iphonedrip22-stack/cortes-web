@@ -217,13 +217,14 @@ function showApp(){
     showError("Não consegui abrir o aplicativo. Atualize a página. " + (e && e.message ? e.message : ""));
     return;
   }
+  if (!location.hash) history.replaceState(null, "", "#/fila");
+  applyRoute();
   detectSchema().then(async () => {
     await loadFila();
     loadLives();
     tickJob();
     renderProfiles();
     subscribe();
-    if (!location.hash) history.replaceState(null, "", "#/fila");
     applyRoute();
   }).catch(err => {
     document.body.classList.remove("is-in");
