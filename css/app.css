@@ -198,3 +198,29 @@ a.proj .meta{margin:0}
 .ajuste textarea{min-height:72px;max-height:160px}
 .ajuste .btn{width:100%;margin-top:8px;justify-content:center}
 .ajuste .hint{margin-top:8px}
+
+/* Wrapping tab bar (HS3D-style layout, Cortes black/yellow) */
+.abas{display:flex;flex-wrap:wrap;gap:6px;padding:8px var(--pad) 10px;border-bottom:1px solid var(--line);background:rgba(11,13,16,.92);position:sticky;top:57px;z-index:19}
+.abas .tab{border:1px solid var(--line);border-radius:999px;padding:7px 12px;font-size:.78rem;font-weight:700;color:var(--muted);background:transparent}
+.abas .tab.is-on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.faixa{background:#3a2a00;color:#ffd400;border:1px solid #5a4300;border-radius:12px;padding:10px 12px;font-size:.82rem}
+.faixa code{background:#0006;color:#ffd400}
+.diario{background:#0c0e12;border:1px solid var(--line);border-radius:10px;padding:12px;white-space:pre-wrap;font-size:.78rem;line-height:1.45;max-height:280px;overflow:auto;color:var(--text)}
+.slot{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.slot .hora{font-weight:800;font-size:1.05rem}
+.table{width:100%;border-collapse:collapse;font-size:.82rem}
+.table th,.table td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+.table th{color:var(--muted);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
+.fmt-card,.meta-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.fmt-card h3,.meta-card h3{margin-bottom:6px}
+.bar{height:8px;background:#222;border-radius:999px;overflow:hidden;margin:8px 0}
+.bar > span{display:block;height:100%;background:var(--accent)}
+.agenda-box{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.agenda-box h3{margin-bottom:6px;font-size:1rem}
+.num-grid{display:grid;gap:10px}
+@media(min-width:700px){.num-grid{grid-template-columns:1fr 1fr 1fr}}
+.dock{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.dock .tab{flex:1 0 auto;min-width:64px}
+@media(min-width:900px){
+  .abas.mobile-only{display:none !important}
+}

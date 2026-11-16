@@ -19,3 +19,7 @@ Se a página abrir mas o login ainda não funcionar, o setup do Supabase ainda n
 ## Perfis (segundo SQL)
 
 Depois da migration inicial, cole também `sql/migration_profiles.sql` no SQL Editor para liberar vários perfis de cortes. A página funciona antes e depois desse passo.
+
+## Painel Maestri (terceiro SQL)
+
+Cole `sql/migration_maestri.sql` no SQL Editor do projeto **cortes** (não o hs3d) para ligar Metas, agenda, pedidos de formato, Números e liberação de formato. Até lá o site continua no ar e essas abas avisam que falta o SQL. Números só mostram valores reais; se não houver coleta, aparece “sem dados ainda”. Nada é publicado por aqui.

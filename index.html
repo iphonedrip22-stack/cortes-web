@@ -23,7 +23,7 @@
     #boot-error.is-on{display:block}
     noscript p{max-width:420px;margin:16px auto;color:#ffd400}
   </style>
-  <link rel="stylesheet" href="css/app.css?v=ajuste1">
+  <link rel="stylesheet" href="css/app.css?v=maestri1">
   <script>
     (function () {
       try {
@@ -90,11 +90,16 @@
         <select id="profile-select" aria-label="Perfil de cortes"></select>
       </label>
       <nav class="side-nav" role="tablist">
-        <a class="tab is-on" href="#/inicio" data-tab="inicio">Início</a>
+        <a class="tab" href="#/fila" data-tab="fila">Fila</a>
+        <a class="tab" href="#/hoje" data-tab="hoje">Hoje</a>
+        <a class="tab" href="#/metas" data-tab="metas">Metas</a>
+        <a class="tab" href="#/novo" data-tab="novo">Novo</a>
+        <a class="tab" href="#/numeros" data-tab="numeros">Números</a>
+        <a class="tab" href="#/formatos" data-tab="formatos">Formatos</a>
         <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
-        <a class="tab" href="#/cortes" data-tab="fila">Cortes</a>
         <a class="tab" href="#/lives" data-tab="lives">Lives</a>
         <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
+        <a class="tab" href="#/inicio" data-tab="inicio">Início</a>
       </nav>
       <p class="sider-note">Nada é publicado por aqui. Aprovar só registra a decisão.</p>
       <button type="button" class="btn ghost sider-out" id="logout-btn">Sair</button>
@@ -111,6 +116,18 @@
         </div>
         <select id="profile-select-m" aria-label="Perfil de cortes"></select>
       </header>
+      <nav class="abas mobile-only" aria-label="Seções">
+        <a class="tab" href="#/fila" data-tab="fila">Fila</a>
+        <a class="tab" href="#/hoje" data-tab="hoje">Hoje</a>
+        <a class="tab" href="#/metas" data-tab="metas">Metas</a>
+        <a class="tab" href="#/novo" data-tab="novo">Novo</a>
+        <a class="tab" href="#/numeros" data-tab="numeros">Números</a>
+        <a class="tab" href="#/formatos" data-tab="formatos">Formatos</a>
+        <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
+        <a class="tab" href="#/lives" data-tab="lives">Lives</a>
+        <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
+        <a class="tab" href="#/inicio" data-tab="inicio">Início</a>
+      </nav>
 
       <main>
         <section id="tab-inicio" class="panel is-on">
@@ -188,8 +205,8 @@
         <section id="tab-fila" class="panel">
           <div class="fila-head">
             <div>
-              <h2>Cortes</h2>
-              <p class="hint tight">Toque na capa para assistir. Aprovar e rejeitar só gravam a decisão.</p>
+              <h2>Fila</h2>
+              <p class="hint tight">Toque na capa para assistir. Aprovar e rejeitar só gravam a decisão. Nada é publicado.</p>
             </div>
             <div class="row">
               <select id="fila-filter" aria-label="Filtrar cortes">
@@ -204,6 +221,147 @@
             </div>
           </div>
           <div id="fila" class="grid"></div>
+        </section>
+
+
+        <section id="tab-hoje" class="panel">
+          <h2 id="hoje-titulo">Hoje</h2>
+          <p class="hint tight">Horários da meta de hoje, neste perfil, contra o que já está na fila. Agendar não é permissão para postar.</p>
+          <p class="faixa" id="faixa-maestri-hoje" hidden>Para metas e agenda, cole <code>sql/migration_maestri.sql</code> no SQL Editor do Supabase (projeto cortes) e clique em Run. Até lá esta aba fica vazia.</p>
+          <div id="hoje-lista"></div>
+          <div class="card" id="hoje-diario">
+            <h2>Diário da esteira</h2>
+            <p class="hint tight">Últimas linhas da nota no Maestri, quando o worker do Mac sincronizar.</p>
+            <pre class="diario" id="diario-lines">sem dados ainda</pre>
+          </div>
+        </section>
+
+        <section id="tab-metas" class="panel">
+          <h2>Metas</h2>
+          <p class="hint tight">Quantos cortes por dia e em que horários, neste perfil. O painel é a fonte da verdade; o Hermes lê o METAS.md gerado no Mac. Não invente quantidade.</p>
+          <p class="faixa" id="faixa-maestri-metas" hidden>Cole <code>sql/migration_maestri.sql</code> no SQL Editor do projeto cortes para cadastrar metas.</p>
+          <div id="metas-lista"></div>
+          <form id="meta-form" class="card" hidden>
+            <h2>Nova meta</h2>
+            <label>Identificador (slug)
+              <input id="meta-id" required placeholder="ex.: close" pattern="[a-z0-9_\-]+">
+            </label>
+            <label>Formato
+              <input id="meta-formato" required placeholder="ex.: close">
+            </label>
+            <label>Cortes por dia
+              <input id="meta-pordia" type="number" min="0" max="24" placeholder="vazio = a definir">
+            </label>
+            <label>Horários (Brasília, separados por vírgula)
+              <input id="meta-horas" placeholder="12:00, 19:00">
+            </label>
+            <label>Plataformas
+              <input id="meta-plats" value="instagram, tiktok, youtube">
+            </label>
+            <label class="check"><input type="checkbox" id="meta-ativa" checked> Meta ativa</label>
+            <button type="submit" class="btn primary">Salvar meta</button>
+            <p class="error" id="meta-err" hidden></p>
+          </form>
+        </section>
+
+        <section id="tab-novo" class="panel">
+          <h2>Novo</h2>
+          <p class="hint tight">Mande um vídeo para a esteira ou peça um formato novo. Nada é publicado daqui.</p>
+          <div class="card">
+            <h2>Novo projeto</h2>
+            <p class="hint">O formulário completo está em Projetos.</p>
+            <a class="btn primary" href="#/projetos/novo">Abrir novo projeto</a>
+          </div>
+          <p class="faixa" id="faixa-maestri-novo" hidden>Para pedidos de formato, cole <code>sql/migration_maestri.sql</code> no SQL Editor do projeto cortes.</p>
+          <form id="pedido-form" class="card">
+            <h2>Pedir formato novo</h2>
+            <p class="hint">O pedido vai para o Hermes. Receitas novas nascem fora da esteira, com um piloto, e só entram na meta depois que você aprovar o formato.</p>
+            <label>Modo
+              <select id="pedido-mode">
+                <option value="link">Copiar de um link</option>
+                <option value="nova">Criar do zero</option>
+              </select>
+            </label>
+            <label>Nome
+              <input id="pedido-nome" required placeholder="Ex.: review curto">
+            </label>
+            <label id="pedido-link-wrap">Link de referência
+              <input id="pedido-link" type="url" placeholder="https://…">
+            </label>
+            <label>Estilo de base
+              <select id="pedido-style">
+                <option value="close">Close</option>
+                <option value="letterbox">Faixas (letterbox)</option>
+                <option value="split">Meia tela</option>
+                <option value="humor">Resenha / meme</option>
+                <option value="storytelling">Storytelling</option>
+              </select>
+            </label>
+            <label>Premissa
+              <textarea id="pedido-premissa" rows="3" placeholder="O que esse formato faz, para quem, e o que não pode mudar."></textarea>
+            </label>
+            <label>Notas
+              <textarea id="pedido-notas" rows="2"></textarea>
+            </label>
+            <button type="submit" class="btn primary" id="pedido-btn">Enviar pedido</button>
+            <p class="error" id="pedido-err" hidden></p>
+          </form>
+          <div id="pedidos-lista"></div>
+        </section>
+
+        <section id="tab-numeros" class="panel">
+          <h2>Números</h2>
+          <p class="hint tight">Métricas reais das contas deste perfil. Se ainda não houver coleta, aparece “sem dados ainda”. Nada é inventado. Postar continua exigindo o seu ok.</p>
+          <p class="faixa" id="faixa-maestri-numeros" hidden>Cole <code>sql/migration_maestri.sql</code> no SQL Editor do projeto cortes para ligar esta aba.</p>
+          <div id="numeros-corpo"><p class="muted">sem dados ainda</p></div>
+          <form id="conta-form" class="card" hidden>
+            <h2>Cadastrar conta (manual)</h2>
+            <p class="hint">Só o handle e o link. Não faz login em rede social.</p>
+            <label>Plataforma
+              <select id="conta-plat">
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+                <option value="youtube">YouTube</option>
+              </select>
+            </label>
+            <label>Handle
+              <input id="conta-handle" placeholder="@diretoaosso">
+            </label>
+            <label>URL
+              <input id="conta-url" type="url" placeholder="https://…">
+            </label>
+            <button type="submit" class="btn primary">Salvar conta</button>
+            <p class="error" id="conta-err" hidden></p>
+          </form>
+          <form id="stat-form" class="card" hidden>
+            <h2>Lançar número manual</h2>
+            <label>Plataforma
+              <select id="stat-plat">
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+                <option value="youtube">YouTube</option>
+              </select>
+            </label>
+            <label>Seguidores
+              <input id="stat-followers" type="number" min="0" step="1">
+            </label>
+            <label>Nota (opcional)
+              <input id="stat-note" placeholder="de onde veio este número">
+            </label>
+            <button type="submit" class="btn primary">Lançar</button>
+            <p class="hint tight">Só grave um número que você viu. Se não tiver, deixe em branco — a aba mostra “sem dados ainda”.</p>
+            <p class="error" id="stat-err" hidden></p>
+          </form>
+          <p>
+            <button type="button" class="btn ghost" id="btn-pedido-coleta" hidden>Pedir atualização agora</button>
+          </p>
+        </section>
+
+        <section id="tab-formatos" class="panel">
+          <h2>Formatos</h2>
+          <p class="hint tight">Os primeiros cortes de cada formato passam por você. Com 10 revisados e 80% aprovados, aparece “Liberar formato”. Liberado não autoriza postar.</p>
+          <p class="faixa" id="faixa-maestri-formatos" hidden>Cole <code>sql/migration_maestri.sql</code> no SQL Editor do projeto cortes para ligar a liberação de formato.</p>
+          <div id="formatos-lista"></div>
         </section>
 
         <section id="tab-lives" class="panel">
@@ -293,9 +451,9 @@
     </div>
 
     <nav class="dock mobile-only" role="tablist">
-      <a class="tab is-on" href="#/inicio" data-tab="inicio">Início</a>
+      <a class="tab" href="#/fila" data-tab="fila">Fila</a>
+      <a class="tab" href="#/hoje" data-tab="hoje">Hoje</a>
       <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
-      <a class="tab" href="#/cortes" data-tab="fila">Cortes</a>
       <a class="tab" href="#/lives" data-tab="lives">Lives</a>
       <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
     </nav>
@@ -315,6 +473,22 @@
           <button type="button" class="btn danger" id="player-reject">Rejeitar</button>
         </div>
         <p class="hint tight">Aprovar só registra a decisão. Nada é publicado.</p>
+        <div class="agenda-box" id="player-agenda" hidden>
+          <h3>Agendar (opcional)</h3>
+          <p class="hint tight">Agendar não publica. Postar continua precisando do seu “pode postar”.</p>
+          <label>Plataforma
+            <select id="agenda-plat">
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="youtube">YouTube</option>
+            </select>
+          </label>
+          <label>Data e hora (Brasília)
+            <input type="datetime-local" id="agenda-when">
+          </label>
+          <button type="button" class="btn primary" id="agenda-btn">Salvar horário</button>
+          <p class="error" id="agenda-err" hidden></p>
+        </div>
         <div class="ajuste" id="player-ajuste">
           <label for="ajuste-text">Pedir ajuste</label>
           <textarea id="ajuste-text" rows="3" maxlength="1000" placeholder="Ex.: o gancho aparece, mas nos primeiros segundos ele está falando outra coisa."></textarea>
@@ -328,8 +502,8 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=ajuste1"></script>
-  <script src="js/supabase.umd.js?v=ajuste1"></script>
-  <script src="js/app.js?v=ajuste1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
+  <script src="js/config.js?v=maestri1"></script>
+  <script src="js/supabase.umd.js?v=maestri1"></script>
+  <script src="js/app.js?v=maestri1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
 </body>
 </html>

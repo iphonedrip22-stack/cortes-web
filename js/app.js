@@ -47,6 +47,21 @@ let currentJobId = null;
 let hasProfiles = false;
 let hasProfileCols = false;
 let hasAjustes = false;
+let hasMaestri = false;
+let hasMetas = false;
+let hasAgenda = false;
+let hasFormatReqs = false;
+let hasFormats = false;
+let hasStats = false;
+let hasAccounts = false;
+let hasKv = false;
+let metas = [];
+let agendaRows = [];
+let formatReqs = [];
+let formatRows = [];
+let statRows = [];
+let accountRows = [];
+let diarioLines = [];
 let profiles = [];
 let currentProfileId = storageGet("cortes.profile") || SEED_PROFILE;
 let allCuts = [];
@@ -98,7 +113,11 @@ function parseRoute(){
   const raw = decodeURIComponent((location.hash || "").replace(/^#\/?/, ""));
   const parts = raw.split("/").filter(Boolean);
   const incoming = parts[0] || "inicio";
-  const map = { inicio:"inicio", projetos:"projetos", cortes:"fila", fila:"fila", lives:"lives", perfis:"perfis" };
+  const map = {
+    inicio:"inicio", projetos:"projetos", cortes:"fila", fila:"fila",
+    lives:"lives", perfis:"perfis", hoje:"hoje", metas:"metas",
+    novo:"novo", numeros:"numeros", formatos:"formatos"
+  };
   const tab = map[incoming] || "inicio";
   const rest = parts[1] || "";
   const focusNew = tab === "projetos" && rest === "novo";
@@ -106,7 +125,7 @@ function parseRoute(){
   return { tab, projectId, focusNew };
 }
 function setTab(name){
-  const path = name === "fila" ? "cortes" : name;
+  const path = name;
   const h = "#/" + path;
   if (location.hash === h || location.hash === "#/" + name) applyRoute();
   else location.hash = h;
@@ -123,6 +142,11 @@ function applyRoute(){
     tickJob();
     renderProjects(projectId, focusNew);
   }
+  if (tab === "hoje") { renderHoje(); loadDiario(); }
+  if (tab === "metas") renderMetas();
+  if (tab === "novo") renderPedidos();
+  if (tab === "numeros") renderNumeros();
+  if (tab === "formatos") renderFormatos();
 }
 
 function initClient(){
@@ -145,6 +169,7 @@ async function detectSchema(){
   hasProfiles = false;
   hasProfileCols = false;
   hasAjustes = false;
+  hasMaestri = hasMetas = hasAgenda = hasFormatReqs = hasFormats = hasStats = hasAccounts = hasKv = false;
   const { data, error } = await sb.from("profiles").select("*").order("created_at", { ascending: true });
   if (!error){
     hasProfiles = true;
@@ -158,10 +183,12 @@ async function detectSchema(){
   hasProfileCols = !probe.error;
   const probeAj = await sb.from("ajustes").select("id").limit(1);
   hasAjustes = !probeAj.error;
+  await detectMaestri();
   fillProfileSelects();
   applyTheme(currentProfile());
   const st = $("#style");
   if (st && currentProfile().default_style) st.value = currentProfile().default_style;
+  setMaestriBanners();
 }
 
 function cutsForProfile(list){
@@ -196,7 +223,7 @@ function showApp(){
     tickJob();
     renderProfiles();
     subscribe();
-    if (!location.hash) history.replaceState(null, "", "#/inicio");
+    if (!location.hash) history.replaceState(null, "", "#/fila");
     applyRoute();
   }).catch(err => {
     document.body.classList.remove("is-in");
@@ -270,6 +297,7 @@ function bindApp(){
       const st = $("#style");
       if (st && currentProfile().default_style) st.value = currentProfile().default_style;
       loadFila(); loadLives(); renderDashboard(); renderProfiles();
+      loadMaestri();
     });
   });
   $("#file").addEventListener("change", () => {
@@ -289,6 +317,16 @@ function bindApp(){
   $("#player-approve").addEventListener("click", () => decideCurrent("approved"));
   $("#player-reject").addEventListener("click", () => decideCurrent("rejected"));
   if ($("#ajuste-btn")) $("#ajuste-btn").addEventListener("click", requestAjuste);
+  if ($("#agenda-btn")) $("#agenda-btn").addEventListener("click", saveAgenda);
+  if ($("#meta-form")) $("#meta-form").addEventListener("submit", onSaveMeta);
+  if ($("#pedido-form")) $("#pedido-form").addEventListener("submit", onPedido);
+  if ($("#pedido-mode")) $("#pedido-mode").addEventListener("change", () => {
+    const wrap = $("#pedido-link-wrap");
+    if (wrap) wrap.hidden = $("#pedido-mode").value === "nova";
+  });
+  if ($("#conta-form")) $("#conta-form").addEventListener("submit", onSaveConta);
+  if ($("#stat-form")) $("#stat-form").addEventListener("submit", onSaveStat);
+  if ($("#btn-pedido-coleta")) $("#btn-pedido-coleta").addEventListener("click", onPedidoColeta);
 }
 
 async function onRun(e){
@@ -607,6 +645,8 @@ async function openPlayer(id){
   const poster = await signedCover(it.cover_path);
   if (poster) video.poster = poster;
   else video.removeAttribute("poster");
+  const ag = $("#player-agenda");
+  if (ag) ag.hidden = !(hasAgenda && decision === "approved");
   $("#player").hidden = false;
   document.body.style.overflow = "hidden";
   const url = await signedVideo(it.preview_path);
@@ -624,6 +664,8 @@ function closePlayer(){
   $("#player").hidden = true;
   document.body.style.overflow = "";
   playerCut = null;
+  const box = $("#player-agenda");
+  if (box) box.hidden = true;
 }
 
 async function decide(id, act){
@@ -645,8 +687,12 @@ async function decide(id, act){
   if (error){ toast(error.message); return; }
   decMap[id] = { cut_id: id, decision: act };
   toast(act === "approved" ? "Aprovado (nada foi publicado)." : "Rejeitado.");
+  const box = $("#player-agenda");
+  if (box) box.hidden = !(act === "approved" && hasAgenda);
   renderFila();
   renderDashboard();
+  renderHoje();
+  renderFormatos();
   if (parseRoute().tab === "projetos") renderProjects(parseRoute().projectId, parseRoute().focusNew);
 }
 function decideCurrent(act){
@@ -917,6 +963,455 @@ function subscribe(){
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => detectSchema())
       .subscribe();
   } catch (e) { /* realtime is optional */ }
+}
+
+
+async function probeTable(name){
+  const { error } = await sb.from(name).select("*").limit(1);
+  return !error;
+}
+async function detectMaestri(){
+  hasMetas = await probeTable("metas");
+  hasAgenda = await probeTable("agenda");
+  hasFormatReqs = await probeTable("format_requests");
+  hasFormats = await probeTable("formats");
+  hasStats = await probeTable("stats");
+  hasAccounts = await probeTable("social_accounts");
+  hasKv = await probeTable("panel_kv");
+  hasMaestri = hasMetas || hasAgenda || hasFormatReqs || hasFormats || hasStats;
+  if (hasMaestri) await loadMaestri();
+  else {
+    metas = []; agendaRows = []; formatReqs = []; formatRows = []; statRows = []; accountRows = []; diarioLines = [];
+  }
+}
+function setMaestriBanners(){
+  const map = {
+    "faixa-maestri-hoje": !hasMetas,
+    "faixa-maestri-metas": !hasMetas,
+    "faixa-maestri-novo": !hasFormatReqs,
+    "faixa-maestri-numeros": !hasStats && !hasAccounts,
+    "faixa-maestri-formatos": !hasFormats,
+  };
+  Object.keys(map).forEach(id => { const el = $("#"+id); if (el) el.hidden = !map[id]; });
+  const mf = $("#meta-form"); if (mf) mf.hidden = !hasMetas;
+  const cf = $("#conta-form"); if (cf) cf.hidden = !hasAccounts;
+  const sf = $("#stat-form"); if (sf) sf.hidden = !hasStats;
+  const bc = $("#btn-pedido-coleta"); if (bc) bc.hidden = !hasAccounts;
+}
+function profileFilter(rows, key){
+  const pid = currentProfile().id;
+  return (rows || []).filter(r => !r[key] || r[key] === pid);
+}
+async function loadMaestri(){
+  if (hasMetas){
+    const { data, error } = await sb.from("metas").select("*").order("ordem", { ascending: true });
+    metas = error ? [] : profileFilter(data || [], "profile_id");
+  }
+  if (hasAgenda){
+    const { data, error } = await sb.from("agenda").select("*").order("scheduled_at", { ascending: true });
+    agendaRows = error ? [] : profileFilter(data || [], "profile_id");
+  }
+  if (hasFormatReqs){
+    const { data, error } = await sb.from("format_requests").select("*").order("created_at", { ascending: false });
+    formatReqs = error ? [] : profileFilter(data || [], "profile_id");
+  }
+  if (hasFormats){
+    const { data, error } = await sb.from("formats").select("*").order("created_at", { ascending: true });
+    formatRows = error ? [] : profileFilter(data || [], "profile_id");
+  }
+  if (hasStats){
+    const { data, error } = await sb.from("stats").select("*").order("captured_at", { ascending: false }).limit(200);
+    statRows = error ? [] : profileFilter(data || [], "profile_id");
+  }
+  if (hasAccounts){
+    const { data, error } = await sb.from("social_accounts").select("*").order("ordem", { ascending: true });
+    accountRows = error ? [] : profileFilter(data || [], "profile_id");
+  }
+  setMaestriBanners();
+  const tab = parseRoute().tab;
+  if (tab === "hoje") { renderHoje(); loadDiario(); }
+  if (tab === "metas") renderMetas();
+  if (tab === "novo") renderPedidos();
+  if (tab === "numeros") renderNumeros();
+  if (tab === "formatos") renderFormatos();
+}
+async function loadDiario(){
+  const el = $("#diario-lines");
+  if (!el) return;
+  if (!hasKv){ el.textContent = "sem dados ainda"; return; }
+  const { data, error } = await sb.from("panel_kv").select("value").eq("key", "diario").maybeSingle();
+  if (error || !data || !data.value){ el.textContent = "sem dados ainda"; return; }
+  const lines = (data.value.lines || []).filter(Boolean);
+  diarioLines = lines;
+  el.textContent = lines.length ? lines.join("\n") : "sem dados ainda";
+}
+function brDate(iso){
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+}
+function todayISO(){
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year:"numeric", month:"2-digit", day:"2-digit" }).formatToParts(new Date());
+  const g = k => (parts.find(p => p.type===k) || {}).value;
+  return `${g("year")}-${g("month")}-${g("day")}`;
+}
+function renderHoje(){
+  const root = $("#hoje-lista");
+  if (!root) return;
+  const titulo = $("#hoje-titulo");
+  const iso = todayISO();
+  if (titulo){
+    const [y,m,d] = iso.split("-");
+    titulo.textContent = `Hoje · ${d}/${m}`;
+  }
+  if (!hasMetas){ root.innerHTML = ""; return; }
+  if (!metas.length){
+    root.innerHTML = `<p class="muted">Nenhuma meta neste perfil. Cadastre na aba Metas, ou deixe vazio — não inventamos quantidade.</p>`;
+    return;
+  }
+  const cuts = cutsForProfile(allCuts);
+  const byId = Object.fromEntries(cuts.map(c => [c.id, c]));
+  let html = "";
+  metas.forEach(m => {
+    const horas = m.horarios || [];
+    const por = m.por_dia == null ? "a definir" : m.por_dia;
+    const status = m.ativo === false || /pausad/i.test(m.status||"") ? "pausada" : (m.status || "ativa");
+    html += `<div class="meta-card"><h3>${esc(m.formato || m.id)}</h3>
+      <p class="meta">${esc(por)} por dia · ${esc(status)}</p>`;
+    if (!horas.length){
+      html += `<p class="muted">Sem horário definido.</p>`;
+    } else {
+      horas.forEach(h => {
+        const when = `${iso}T${String(h).padStart(5,"0")}`;
+        const booked = agendaRows.filter(a => (a.scheduled_at||"").slice(0,16).replace(" ","T") === when ||
+          (brDate(a.scheduled_at).includes(h) && (a.scheduled_at||"").slice(0,10) === iso));
+        // simpler: match date + hour
+        const hit = agendaRows.find(a => {
+          const d = new Date(a.scheduled_at);
+          const parts = new Intl.DateTimeFormat("en-GB", { timeZone:"America/Sao_Paulo", hour:"2-digit", minute:"2-digit", year:"numeric", month:"2-digit", day:"2-digit", hour12:false }).formatToParts(d);
+          const g = k => (parts.find(p=>p.type===k)||{}).value;
+          const day = `${g("year")}-${g("month")}-${g("day")}`;
+          const hm = `${g("hour")}:${g("minute")}`;
+          return day === iso && hm === String(h).padStart(5,"0");
+        });
+        const cut = hit ? byId[hit.cut_id] : null;
+        const right = cut ? esc(cut.hook || cut.id) : "vago";
+        html += `<div class="slot"><div><div class="hora">${esc(h)}</div><p class="meta">${esc(m.formato||m.id)}</p></div><div>${right}</div></div>`;
+      });
+    }
+    html += `</div>`;
+  });
+  root.innerHTML = html;
+}
+function renderMetas(){
+  const root = $("#metas-lista");
+  if (!root) return;
+  if (!hasMetas){ root.innerHTML = ""; return; }
+  if (!metas.length){
+    root.innerHTML = `<p class="muted">Nenhuma meta ainda. Se a quantidade não estiver definida, não produza além do combinado e não invente número.</p>`;
+    return;
+  }
+  root.innerHTML = `<table class="table"><thead><tr><th>Formato</th><th>Por dia</th><th>Horários</th><th>Status</th></tr></thead><tbody>` +
+    metas.map(m => `<tr>
+      <td>${esc(m.formato || m.id)}</td>
+      <td>${m.por_dia == null ? "a definir" : m.por_dia}</td>
+      <td>${esc((m.horarios||[]).join(", ") || "a definir")}</td>
+      <td>${esc(m.ativo === false ? "pausada" : (m.status || "ativa"))}</td>
+    </tr>`).join("") + `</tbody></table>`;
+}
+function slugify(s){
+  return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40) || "meta";
+}
+async function onSaveMeta(e){
+  e.preventDefault();
+  const err = $("#meta-err");
+  if (err){ err.hidden = true; err.textContent = ""; }
+  if (!hasMetas){ toast("Cole o SQL do painel no Supabase para cadastrar metas."); return; }
+  const formato = $("#meta-formato").value.trim();
+  const rawId = ($("#meta-id").value.trim() || slugify(formato));
+  const pid = currentProfile().id;
+  const id = rawId.includes(pid.slice(0,8)) ? rawId : `${slugify(currentProfile().handle || currentProfile().name)}-${rawId}`;
+  const porRaw = $("#meta-pordia").value;
+  const horas = $("#meta-horas").value.split(",").map(s => s.trim()).filter(Boolean);
+  const plats = $("#meta-plats").value.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const row = {
+    id,
+    formato: formato || rawId,
+    profile_id: pid,
+    profile_nome: currentProfile().name,
+    por_dia: porRaw === "" ? null : Number(porRaw),
+    horarios: horas,
+    plataformas: plats.length ? plats : ["instagram","tiktok","youtube"],
+    ativo: $("#meta-ativa").checked,
+    status: $("#meta-ativa").checked ? "ativa" : "pausada",
+  };
+  const { error } = await sb.from("metas").upsert(row);
+  if (error){
+    if (err){ err.hidden = false; err.textContent = error.message; }
+    toast(error.message);
+    return;
+  }
+  toast("Meta salva. O Hermes lê no próximo ciclo do worker.");
+  await loadMaestri();
+  renderMetas();
+}
+function renderPedidos(){
+  const root = $("#pedidos-lista");
+  if (!root) return;
+  if (!hasFormatReqs){ root.innerHTML = ""; return; }
+  if (!formatReqs.length){ root.innerHTML = `<p class="muted">Nenhum pedido de formato ainda.</p>`; return; }
+  const stNome = { novo:"novo", em_criacao:"em criação", piloto:"piloto", aprovado:"aprovado" };
+  root.innerHTML = formatReqs.map(p => `<div class="fmt-card">
+    <h3>${esc(p.name || "sem nome")}</h3>
+    <p class="meta">${esc(stNome[p.status] || p.status)} · ${esc(p.mode || "")} · ${esc(brDate(p.created_at))}</p>
+    <p>${esc(p.premise || p.notes || "")}</p>
+    ${p.link ? `<p class="meta"><a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.link)}</a></p>` : ""}
+  </div>`).join("");
+}
+async function onPedido(e){
+  e.preventDefault();
+  const err = $("#pedido-err");
+  if (err){ err.hidden = true; err.textContent = ""; }
+  if (!hasFormatReqs){
+    const msg = "Cole o sql/migration_maestri.sql no Supabase para enviar o pedido por aqui.";
+    if (err){ err.hidden = false; err.textContent = msg; }
+    toast(msg);
+    return;
+  }
+  const mode = $("#pedido-mode").value;
+  const name = $("#pedido-nome").value.trim();
+  const link = ($("#pedido-link").value || "").trim();
+  if (mode === "link" && !link){
+    if (err){ err.hidden = false; err.textContent = "Cole o link de referência, ou mude o modo para criar do zero."; }
+    return;
+  }
+  const { data: sessionData } = await sb.auth.getUser();
+  const email = sessionData && sessionData.user && sessionData.user.email;
+  const row = {
+    profile_id: currentProfile().id,
+    profile_nome: currentProfile().name,
+    mode,
+    name,
+    link: mode === "link" ? link : null,
+    style: $("#pedido-style").value,
+    premise: $("#pedido-premissa").value.trim() || null,
+    notes: $("#pedido-notas").value.trim() || null,
+    status: "novo",
+    created_by: email || null,
+  };
+  const { error } = await sb.from("format_requests").insert(row);
+  if (error){
+    if (err){ err.hidden = false; err.textContent = error.message; }
+    toast(error.message);
+    return;
+  }
+  toast("Pedido de formato registrado. Nada foi publicado.");
+  $("#pedido-nome").value = "";
+  $("#pedido-link").value = "";
+  $("#pedido-premissa").value = "";
+  $("#pedido-notas").value = "";
+  await loadMaestri();
+  renderPedidos();
+}
+function formatoDe(it){
+  return (it && (it.formato || it.style || it.default_style)) || (it && it.qc && it.qc.style) || "";
+}
+function statsFormato(nome){
+  const cuts = cutsForProfile(allCuts).filter(c => (formatoDe(c) || "").toLowerCase() === String(nome||"").toLowerCase() || (c.version||"").toLowerCase().includes(String(nome||"").toLowerCase()));
+  // Prefer cuts whose style matches; if none tagged, fall back to all? No — don't invent. If we can't tell the format, skip.
+  const tagged = cutsForProfile(allCuts).filter(c => {
+    const f = (c.style || (c.qc && (c.qc.style || c.qc.format)) || c.formato || "").toLowerCase();
+    return f && f === String(nome||"").toLowerCase();
+  });
+  const list = tagged;
+  const revisados = list.filter(c => {
+    const d = decisionOf(c.id);
+    return d === "approved" || d === "rejected";
+  });
+  const aprovados = revisados.filter(c => decisionOf(c.id) === "approved");
+  return { total: list.length, revisados: revisados.length, aprovados: aprovados.length, rate: revisados.length ? aprovados.length / revisados.length : 0 };
+}
+function renderFormatos(){
+  const root = $("#formatos-lista");
+  if (!root) return;
+  if (!hasFormats){ root.innerHTML = ""; return; }
+  const known = [];
+  const seen = new Set();
+  formatRows.forEach(f => { known.push(f); seen.add((f.nome || f.id || "").toLowerCase()); });
+  // also show recipe names present in metas
+  metas.forEach(m => {
+    const nome = m.formato || m.id;
+    if (nome && !seen.has(String(nome).toLowerCase())){
+      known.push({ id: m.id, nome, profile_id: m.profile_id, status: "em_teste", min_reviews: 10, min_rate: 0.8, _virtual: true });
+      seen.add(String(nome).toLowerCase());
+    }
+  });
+  if (!known.length){
+    root.innerHTML = `<p class="muted">Nenhum formato cadastrado ainda. Os cortes aprovados e rejeitados deste perfil entram na conta quando o formato estiver identificado.</p>`;
+    return;
+  }
+  root.innerHTML = known.map(f => {
+    const st = statsFormato(f.nome || f.id);
+    const need = f.min_reviews || 10;
+    const minRate = Number(f.min_rate || 0.8);
+    const pct = st.revisados ? Math.round(st.rate * 100) : 0;
+    const canLib = f.status === "em_teste" && st.revisados >= need && st.rate >= minRate;
+    const bar = Math.min(100, Math.round((st.revisados / need) * 100));
+    const status = f.status === "liberado" ? "liberado" : f.status === "pausado" ? "pausado" : "em teste";
+    const actions = hasFormats && !f._virtual ? (
+      (canLib ? `<button type="button" class="btn primary" data-fmt="${esc(f.id)}" data-fmt-act="liberar">Liberar formato</button>` : "") +
+      (f.status === "liberado" ? `<button type="button" class="btn ghost" data-fmt="${esc(f.id)}" data-fmt-act="pausar">Pausar</button>` : "") +
+      (f.status === "pausado" ? `<button type="button" class="btn ghost" data-fmt="${esc(f.id)}" data-fmt-act="teste">Voltar a teste</button>` : "")
+    ) : "";
+    return `<div class="fmt-card">
+      <h3>${esc(f.nome || f.id)}</h3>
+      <p class="meta">${esc(status)} · ${st.revisados} revisados · ${st.aprovados} aprovados${st.revisados? " · "+pct+"%":""}</p>
+      <div class="bar" aria-hidden="true"><span style="width:${bar}%"></span></div>
+      <p class="hint tight">Meta para liberar: ${need} revisados e ${Math.round(minRate*100)}% aprovados. Liberar não autoriza postar.</p>
+      <div class="actions">${actions}</div>
+    </div>`;
+  }).join("");
+  root.querySelectorAll("[data-fmt-act]").forEach(btn => {
+    btn.addEventListener("click", () => onFormatoAct(btn.dataset.fmt, btn.dataset.fmtAct));
+  });
+}
+async function onFormatoAct(id, act){
+  if (!hasFormats || !id) return;
+  const { data: sessionData } = await sb.auth.getUser();
+  const email = sessionData && sessionData.user && sessionData.user.email;
+  const patch = { updated_by: email || null };
+  if (act === "liberar"){
+    patch.status = "liberado";
+    patch.liberado_at = new Date().toISOString();
+    patch.liberado_by = email || null;
+    patch.status_reason = "Liberado no painel (10 revisados e 80% aprovados). Postar continua exigindo ok do Matheus.";
+  } else if (act === "pausar"){
+    patch.status = "pausado";
+    patch.status_reason = "Pausado no painel.";
+  } else {
+    patch.status = "em_teste";
+    patch.status_reason = "Voltado para teste no painel.";
+  }
+  const { error } = await sb.from("formats").update(patch).eq("id", id);
+  if (error){ toast(error.message); return; }
+  toast(act === "liberar" ? "Formato liberado. Postar continua precisando do seu ok." : "Status do formato atualizado.");
+  await loadMaestri();
+  renderFormatos();
+}
+function lastStat(plat, field){
+  return (statRows || []).find(n => n.platform === plat && n.scope === "conta" && n[field] != null);
+}
+function renderNumeros(){
+  const root = $("#numeros-corpo");
+  if (!root) return;
+  if (!hasStats && !hasAccounts){ root.innerHTML = `<p class="muted">sem dados ainda</p>`; return; }
+  const plats = ["instagram","tiktok","youtube"];
+  const cards = plats.map(pl => {
+    const acc = (accountRows || []).find(a => a.platform === pl);
+    const fol = lastStat(pl, "followers");
+    const handle = (acc && acc.handle) || (currentProfile().platforms && currentProfile().platforms[pl]) || "";
+    const val = fol && fol.followers != null ? fol.followers : null;
+    const fonte = fol ? `${fol.source || "manual"} · ${brDate(fol.captured_at)}` : "";
+    return `<div class="stat">
+      <span>${pl}${handle? " · "+esc(handle):""}</span>
+      <b>${val == null ? "sem dados ainda" : val.toLocaleString("pt-BR")}</b>
+      <span>${esc(fonte)}</span>
+    </div>`;
+  }).join("");
+  const hasAny = (statRows || []).some(n => n.followers != null || n.views != null);
+  root.innerHTML = `<div class="num-grid">${cards}</div>` + (hasAny ? "" : `<p class="muted">sem dados ainda</p>`);
+}
+async function onSaveConta(e){
+  e.preventDefault();
+  const err = $("#conta-err");
+  if (err){ err.hidden = true; }
+  if (!hasAccounts) return;
+  const plat = $("#conta-plat").value;
+  const handle = $("#conta-handle").value.trim();
+  const url = $("#conta-url").value.trim();
+  const pid = currentProfile().id;
+  const row = {
+    id: `${pid}:${plat}`,
+    profile_id: pid,
+    profile_nome: currentProfile().name,
+    platform: plat,
+    handle,
+    url: url || null,
+    connect_status: "manual",
+  };
+  const { error } = await sb.from("social_accounts").upsert(row);
+  if (error){ if (err){ err.hidden=false; err.textContent=error.message; } toast(error.message); return; }
+  toast("Conta salva. Nenhuma rede foi conectada.");
+  await loadMaestri();
+  renderNumeros();
+}
+async function onSaveStat(e){
+  e.preventDefault();
+  const err = $("#stat-err");
+  if (err){ err.hidden = true; }
+  if (!hasStats) return;
+  const raw = $("#stat-followers").value;
+  if (raw === ""){ if (err){ err.hidden=false; err.textContent="Se não houver número, não lance nada — a aba já mostra “sem dados ainda”."; } return; }
+  const { data: sessionData } = await sb.auth.getUser();
+  const email = sessionData && sessionData.user && sessionData.user.email;
+  const row = {
+    profile_id: currentProfile().id,
+    platform: $("#stat-plat").value,
+    scope: "conta",
+    followers: Number(raw),
+    source: "manual",
+    note: $("#stat-note").value.trim() || null,
+    captured_at: new Date().toISOString(),
+    created_by: email || null,
+  };
+  const { error } = await sb.from("stats").insert(row);
+  if (error){ if (err){ err.hidden=false; err.textContent=error.message; } toast(error.message); return; }
+  toast("Número lançado.");
+  $("#stat-followers").value = "";
+  $("#stat-note").value = "";
+  await loadMaestri();
+  renderNumeros();
+}
+async function onPedidoColeta(){
+  if (!hasAccounts){ toast("Cole o SQL do painel para pedir a coleta."); return; }
+  const pid = currentProfile().id;
+  const now = new Date().toISOString();
+  const mine = accountRows.filter(a => a.profile_id === pid);
+  if (!mine.length){ toast("Cadastre pelo menos uma conta neste perfil."); return; }
+  for (const a of mine){
+    await sb.from("social_accounts").update({ refresh_requested_at: now }).eq("id", a.id);
+  }
+  toast("Pedido de coleta registrado. O job do Mac (9h ou o próximo ciclo) pede ao Postagem, só leitura.");
+}
+async function saveAgenda(){
+  const err = $("#agenda-err");
+  if (err){ err.hidden = true; err.textContent = ""; }
+  if (!hasAgenda || !playerCut){
+    if (err){ err.hidden = false; err.textContent = "Cole o SQL do painel no Supabase para agendar."; }
+    return;
+  }
+  const when = $("#agenda-when").value;
+  if (!when){
+    if (err){ err.hidden = false; err.textContent = "Escolha data e hora (Brasília)."; }
+    return;
+  }
+  // datetime-local is naive; treat as Brasília (UTC-3, no DST in 2026)
+  const iso = when.length === 16 ? when + ":00-03:00" : when;
+  const { data: sessionData } = await sb.auth.getUser();
+  const email = sessionData && sessionData.user && sessionData.user.email;
+  const row = {
+    cut_id: playerCut.id,
+    profile_id: currentProfile().id,
+    platform: $("#agenda-plat").value,
+    scheduled_at: iso,
+    updated_by: email || null,
+  };
+  const { error } = await sb.from("agenda").upsert(row, { onConflict: "cut_id,platform" });
+  if (error){ if (err){ err.hidden=false; err.textContent=error.message; } toast(error.message); return; }
+  toast("Horário salvo. Nada foi publicado.");
+  await loadMaestri();
+  renderHoje();
 }
 
 try { boot(); } catch (err) { showGate(); showError("Não consegui iniciar a página."); }
