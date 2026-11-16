@@ -70,6 +70,9 @@ let playerCut = null;
 let signedCache = {};
 let coverCache = {};
 let appBound = false;
+let schemaReady = false;   // a home só sai do skeleton depois do primeiro detectSchema
+let filaOk = false;        // a última leitura de cuts/decisions deu certo
+let filaAnimKey = "";
 
 function toast(msg){
   const t = $("#toast");
@@ -79,6 +82,32 @@ function toast(msg){
 }
 function esc(s){
   return String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+}
+// Só troca o DOM quando o HTML muda: evita piscar e repetir animação a cada evento do realtime.
+function setHtml(el, html){
+  if (el._html === html) return false;
+  el._html = html;
+  el.innerHTML = html;
+  return true;
+}
+function reduceMotion(){
+  return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+// Anima só números reais (data-count). O texto final já está no HTML; com movimento reduzido nada roda.
+function countUp(root){
+  if (reduceMotion()) return;
+  root.querySelectorAll("[data-count]").forEach(el => {
+    const end = Number(el.dataset.count);
+    if (!Number.isFinite(end) || end <= 0) return;
+    const t0 = performance.now();
+    el.textContent = "0";   // já no mesmo frame, para o valor final não piscar antes da contagem
+    const step = now => {
+      const k = Math.min(1, (now - t0) / 700);
+      el.textContent = Math.round(end * (1 - Math.pow(1 - k, 3))).toLocaleString("pt-BR");
+      if (k < 1 && el.isConnected) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
 }
 function safeUrl(u){
   u = String(u||"").trim();
@@ -104,34 +133,33 @@ function applyTheme(p){
   ["login-mark","app-mark","app-mark-m"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = initials || "CS"; });
   const title = appName;
   document.title = `${p.name} · ${title}`;
-  ["login-title","app-title","app-title-m"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = title; });
+  ["login-title","app-title"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = title; });
   if ($("#login-tag")) $("#login-tag").textContent = appTagline;
   if ($("#app-tag")) $("#app-tag").textContent = p.name;
-  if ($("#profile-label-m")) $("#profile-label-m").textContent = p.handle ? `@${p.handle.replace(/^@/,"")}` : (p.niche || "");
-  if ($("#dash-kicker")) $("#dash-kicker").textContent = p.niche || "Perfil";
-  if ($("#dash-title")) $("#dash-title").textContent = p.name;
-  if ($("#dash-sub")) $("#dash-sub").textContent = [p.niche, p.handle ? `@${p.handle.replace(/^@/,"")}` : ""].filter(Boolean).join(" · ");
+  if ($("#dash-sub")) $("#dash-sub").textContent = [p.name, p.niche, p.handle ? `@${p.handle.replace(/^@/,"")}` : ""].filter(Boolean).join(" · ");
 }
 
 function fillProfileSelects(){
   const html = profiles.map(p => `<option value="${esc(p.id)}" ${p.id===currentProfileId?"selected":""}>${esc(p.name)}</option>`).join("");
-  ["#profile-select","#profile-select-m"].forEach(sel => { const el=$(sel); if (el) el.innerHTML = html; });
+  $("#profile-select").innerHTML = html;
 }
 
 function parseRoute(){
   const raw = decodeURIComponent((location.hash || "").replace(/^#\/?/, ""));
   const parts = raw.split("/").filter(Boolean);
   const incoming = parts[0] || "inicio";
+  // Início e Fila são a mesma tela (painel consolidado). #/fila/completa abre a fila em largura total.
   const map = {
-    inicio:"inicio", projetos:"projetos", cortes:"fila", fila:"fila",
+    inicio:"fila", projetos:"projetos", cortes:"fila", fila:"fila",
     lives:"lives", perfis:"perfis", hoje:"hoje", metas:"metas",
     novo:"novo", numeros:"numeros", formatos:"formatos"
   };
-  const tab = map[incoming] || "inicio";
+  const tab = map[incoming] || "fila";
   const rest = parts[1] || "";
+  const full = tab === "fila" && rest === "completa";
   const focusNew = tab === "projetos" && rest === "novo";
   const projectId = tab === "projetos" && rest && rest !== "novo" ? rest : null;
-  return { tab, projectId, focusNew };
+  return { tab, projectId, focusNew, full };
 }
 function setTab(name){
   const path = name;
@@ -140,12 +168,18 @@ function setTab(name){
   else location.hash = h;
 }
 function applyRoute(){
-  const { tab, projectId, focusNew } = parseRoute();
-  $$(".tab").forEach(x => x.classList.toggle("is-on", x.dataset.tab === tab));
+  const { tab, projectId, focusNew, full } = parseRoute();
+  $$(".tab").forEach(x => {
+    const on = x.dataset.tab === tab;
+    x.classList.toggle("is-on", on);
+    if (on) x.setAttribute("aria-current", "page");
+    else x.removeAttribute("aria-current");
+  });
   $$(".panel").forEach(p => p.classList.toggle("is-on", p.id === "tab-"+tab));
+  $("#tab-fila").classList.toggle("is-full", full);
+  railMore(false);
   if (tab === "fila") loadFila();
   if (tab === "lives") loadLives();
-  if (tab === "inicio") renderDashboard();
   if (tab === "perfis") renderProfiles();
   if (tab === "projetos"){
     tickJob();
@@ -198,6 +232,7 @@ async function detectSchema(){
   const st = $("#style");
   if (st && currentProfile().default_style) st.value = currentProfile().default_style;
   setMaestriBanners();
+  schemaReady = true;
 }
 
 function cutsForProfile(list){
@@ -226,7 +261,7 @@ function showApp(){
     showError("Não consegui abrir o aplicativo. Atualize a página. " + (e && e.message ? e.message : ""));
     return;
   }
-  if (!location.hash) history.replaceState(null, "", "#/fila");
+  if (!location.hash) history.replaceState(null, "", "#/inicio");
   applyRoute();
   detectSchema().then(async () => {
     await loadFila();
@@ -244,7 +279,7 @@ function showGate(){ document.body.classList.remove("is-in"); }
 
 async function boot(){
   try {
-    ["login-title","app-title","app-title-m"].forEach(id => { const el=$("#"+id); if (el) el.textContent = appName; });
+    ["login-title","app-title"].forEach(id => { const el=$("#"+id); if (el) el.textContent = appName; });
     if ($("#login-tag")) $("#login-tag").textContent = appTagline;
     document.title = appName;
     sb = initClient();
@@ -298,18 +333,17 @@ function bindApp(){
     ev.preventDefault();
     setTab(b.dataset.go);
   }));
-  ["#profile-select","#profile-select-m"].forEach(sel => {
-    $(sel).addEventListener("change", e => {
-      currentProfileId = e.target.value;
-      storageSet("cortes.profile", currentProfileId);
-      applyTheme(currentProfile());
-      fillProfileSelects();
-      const st = $("#style");
-      if (st && currentProfile().default_style) st.value = currentProfile().default_style;
-      loadFila(); loadLives(); renderDashboard(); renderProfiles();
-      loadMaestri();
-    });
+  $("#profile-select").addEventListener("change", e => {
+    currentProfileId = e.target.value;
+    storageSet("cortes.profile", currentProfileId);
+    applyTheme(currentProfile());
+    fillProfileSelects();
+    const st = $("#style");
+    if (st && currentProfile().default_style) st.value = currentProfile().default_style;
+    loadFila(); loadLives(); renderDashboard(); renderProfiles();
+    loadMaestri();
   });
+  bindRail();
   $("#file").addEventListener("change", () => {
     const f = $("#file").files[0];
     $("#file-name").textContent = f ? `${f.name} (${(f.size/1048576).toFixed(1)} MB)` : "";
@@ -323,7 +357,7 @@ function bindApp(){
   $("#profile-form").addEventListener("submit", onCreateProfile);
   $("#player-close").addEventListener("click", closePlayer);
   $("#player-close-bg").addEventListener("click", closePlayer);
-  document.addEventListener("keydown", ev => { if (ev.key === "Escape") closePlayer(); });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape"){ closePlayer(); railMore(false); } });
   $("#player-approve").addEventListener("click", () => decideCurrent("approved"));
   $("#player-reject").addEventListener("click", () => decideCurrent("rejected"));
   if ($("#ajuste-btn")) $("#ajuste-btn").addEventListener("click", requestAjuste);
@@ -337,6 +371,56 @@ function bindApp(){
   if ($("#conta-form")) $("#conta-form").addEventListener("submit", onSaveConta);
   if ($("#stat-form")) $("#stat-form").addEventListener("submit", onSaveStat);
   if ($("#btn-pedido-coleta")) $("#btn-pedido-coleta").addEventListener("click", onPedidoColeta);
+}
+
+function railMore(on){
+  const rail = $("#rail"), btn = $("#rail-more-btn");
+  if (!rail || !btn) return;
+  rail.classList.toggle("is-open", on);
+  btn.setAttribute("aria-expanded", on ? "true" : "false");
+}
+// text/uri-list pode trazer comentários (#) e várias linhas: vale a primeira URL, e só https.
+function linkFromDrop(text){
+  const first = String(text||"").split(/\r?\n/).map(t => t.trim()).find(t => t && !t.startsWith("#")) || "";
+  return safeUrl(first.split(/\s+/)[0]);
+}
+// Só abre o formulário já preenchido. Quem roda a esteira é o botão do formulário.
+function novoComLink(text){
+  const u = linkFromDrop(text);
+  if (!u){ toast("Só aceito link https. Cole o endereço completo do vídeo."); return; }
+  $("#url").value = u;
+  setTab("projetos/novo");
+  toast("Link colocado em Novo projeto. Confira e clique em Rodar esteira.");
+}
+function bindRail(){
+  const rail = $("#rail");
+  $("#rail-more-btn").addEventListener("click", () => railMore(!rail.classList.contains("is-open")));
+  document.addEventListener("click", ev => {
+    if (!ev.target.closest("#rail-more, #rail-more-btn")) railMore(false);
+  });
+  // os próprios ícones não podem ser arrastados para o "+" (viraria link da própria página)
+  $$("a", rail).forEach(a => { a.draggable = false; });
+  rail.addEventListener("dragover", ev => { ev.preventDefault(); rail.classList.add("is-drop"); });
+  rail.addEventListener("dragleave", ev => { if (!rail.contains(ev.relatedTarget)) rail.classList.remove("is-drop"); });
+  rail.addEventListener("drop", ev => {
+    ev.preventDefault();
+    rail.classList.remove("is-drop");
+    const dt = ev.dataTransfer;
+    if (!dt) return;
+    if (dt.files && dt.files.length){
+      // sem upload automático: o envio só acontece pelo formulário, com o clique do usuário
+      setTab("projetos/novo");
+      toast("Para enviar um arquivo, escolha o vídeo no formulário de Novo projeto.");
+      return;
+    }
+    novoComLink(dt.getData("text/uri-list") || dt.getData("text/plain"));
+  });
+  document.addEventListener("paste", ev => {
+    if (!document.body.classList.contains("is-in") || !$("#player").hidden) return;
+    if (ev.target && ev.target.closest && ev.target.closest("input,textarea,select,[contenteditable]")) return;
+    const text = (ev.clipboardData && ev.clipboardData.getData("text/plain")) || "";
+    if (/^\s*https?:\/\//i.test(text)) novoComLink(text);
+  });
 }
 
 async function onRun(e){
@@ -468,7 +552,16 @@ async function loadFila(){
     sb.from("cuts").select("*").order("mtime", { ascending: false, nullsFirst: false }),
     sb.from("decisions").select("*"),
   ]);
-  if (e1){ $("#fila").innerHTML = `<p class="error">${esc(e1.message)}</p>`; return; }
+  if (e1){
+    filaOk = false;
+    allCuts = [];
+    decMap = {};
+    $("#fila").removeAttribute("aria-busy");
+    setHtml($("#fila"), `<p class="error">${esc(e1.message)}</p>`);
+    renderDashboard();
+    return;
+  }
+  filaOk = true;
   decMap = {};
   (decs || []).forEach(d => { decMap[d.cut_id] = d; });
   allCuts = cutsForProfile(cuts || []);
@@ -485,8 +578,23 @@ async function renderFila(){
   else if (filter === "rejected") items = items.filter(it => decisionOf(it.id) === "rejected");
   else if (filter === "ajuste") items = items.filter(it => decisionOf(it.id) === "ajuste pedido");
   else if (filter === "live") items = items.filter(it => it.tag === "live");
+  const root = $("#fila");
+  root.removeAttribute("aria-busy");
+  if ($("#fila-count")) $("#fila-count").textContent = items.length ? String(items.length) : "";
+  const more = $("#fila-more");
+  if (more){
+    // no celular a home mostra só os 4 primeiros (CSS); o resto fica a um toque
+    more.hidden = items.length <= 4;
+    more.textContent = `Ver todos os ${items.length} cortes`;
+  }
+  const animKey = filter + "|" + currentProfile().id;
+  if (animKey !== filaAnimKey){
+    filaAnimKey = animKey;
+    root.classList.add("stagger");
+    setTimeout(() => root.classList.remove("stagger"), 900);
+  }
   if (!items.length){
-    $("#fila").innerHTML = `<p class="muted">Nenhum corte nesta vista. Se a fila estiver vazia, o servidor ainda está sincronizando.</p>`;
+    setHtml(root, `<p class="empty">Nenhum corte nesta vista. Se a fila estiver vazia, o servidor ainda está sincronizando.</p>`);
     return;
   }
   // Sign covers only — never attach a video src in the list.
@@ -494,8 +602,7 @@ async function renderFila(){
   await Promise.all(items.map(async it => {
     covers[it.id] = await signedCover(it.cover_path);
   }));
-  $("#fila").innerHTML = items.map(it => cardHtml(it, covers[it.id])).join("");
-  bindCutActions($("#fila"));
+  if (setHtml(root, items.map(it => cardHtml(it, covers[it.id])).join(""))) bindCutActions(root);
 }
 
 function bindCutActions(root){
@@ -504,6 +611,12 @@ function bindCutActions(root){
   root.querySelectorAll("button[data-act]").forEach(b => b.addEventListener("click", ev => {
     ev.stopPropagation();
     decide(b.closest(".cut").dataset.id, b.dataset.act);
+  }));
+  // "Ajuste" abre o player já no campo de pedido (o pedido continua sendo feito lá)
+  root.querySelectorAll("button[data-ajuste]").forEach(b => b.addEventListener("click", async () => {
+    await openPlayer(b.closest(".cut").dataset.id);
+    const t = $("#ajuste-text");
+    if (t && !$("#player").hidden) t.focus();
   }));
 }
 
@@ -623,6 +736,7 @@ function cardHtml(it, coverUrl){
       <div class="actions">
         <button class="btn ok" data-act="approved">Aprovar</button>
         <button class="btn danger" data-act="rejected">Rejeitar</button>
+        <button type="button" class="btn ghost" data-ajuste aria-label="Pedir ajuste">Ajuste</button>
       </div>
     </div>
   </article>`;
@@ -771,37 +885,61 @@ async function requestAjuste(){
   if (parseRoute().tab === "projetos") renderProjects(parseRoute().projectId, parseRoute().focusNew);
 }
 
-async function renderDashboard(){
-  const items = allCuts;
-  const pending = items.filter(it => isOpenDecision(decisionOf(it.id)));
-  const approved = items.filter(it => decisionOf(it.id) === "approved");
-  const live = items.filter(it => it.tag === "live");
-  $("#dash-stats").innerHTML = [
-    [items.length, "Cortes no perfil"],
-    [pending.length, "Pendentes"],
-    [approved.length, "Aprovados"],
-    [live.length, "Cortes de live"],
-  ].map(([n,l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
-  const show = pending.slice(0, 5);
-  if (!show.length){
-    $("#dash-pending").innerHTML = `<p class="muted">Nada pendente neste perfil.</p>`;
-    return;
+// Lado direito da home: Hoje e Números condensados. Só usa o que já foi carregado.
+function renderDashboard(){
+  if (!schemaReady) return;
+  renderHojeCompacto();
+  renderNumerosCompacto();
+}
+const SEM_DADOS = `<b class="nodata">sem dados ainda</b>`;
+function renderHojeCompacto(){
+  const root = $("#hoje-mini");
+  if (!root) return;
+  const lbl = $("#hoje-mini-data");
+  if (lbl) lbl.textContent = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit" });
+  const num = n => `<b data-count="${n}">${n}</b>`;
+  const pend = allCuts.filter(it => decisionOf(it.id) === "pending").length;
+  const ajustes = allCuts.filter(it => decisionOf(it.id) === "ajuste pedido").length;
+  const slots = [];
+  if (hasMetas) hojeSlots().forEach(g => g.slots.forEach(sl => slots.push({ h: sl.h, cut: sl.cut, m: g.m, pausada: metaStatus(g.m) === "pausada" })));
+  slots.sort((x, y) => String(x.h).localeCompare(String(y.h)));
+  const ativos = slots.filter(sl => !sl.pausada);
+  const cheios = ativos.filter(sl => sl.cut).length;
+  let html = `<div class="kpis">
+    <div class="kpi">${filaOk ? num(pend) : SEM_DADOS}<span>pendentes de aprovação</span></div>
+    <div class="kpi">${filaOk ? num(ajustes) : SEM_DADOS}<span>com ajuste pedido</span></div>
+    <div class="kpi">${ativos.length ? `<b>${cheios}<small>/${ativos.length}</small></b>` : SEM_DADOS}<span>horários de hoje preenchidos</span></div>
+  </div>`;
+  if (ativos.length){
+    html += `<div class="bar" role="img" aria-label="${cheios} de ${ativos.length} horários de hoje preenchidos"><span style="width:${Math.round(cheios / ativos.length * 100)}%"></span></div>`;
   }
-  const covers = {};
-  await Promise.all(show.map(async it => { covers[it.id] = await signedCover(it.cover_path); }));
-  $("#dash-pending").innerHTML = show.map(it => {
-    const thumb = covers[it.id] ? `<img src="${covers[it.id]}" alt="">` : `<span class="ph"></span>`;
-    return `<div class="mini" data-play="${esc(it.id)}">
-      ${thumb}
-      <div>
-        <h3>${esc(it.hook || it.cut_id)}</h3>
-        <p class="meta">${esc(cutLabel(it))}</p>
-      </div>
+  if (!hasMetas) html += `<p class="empty">Metas e agenda ainda não estão ligadas. Os detalhes estão na aba Hoje.</p>`;
+  else if (!metas.length) html += `<p class="empty">Nenhuma meta neste perfil. Cadastre na aba Metas, ou deixe vazio — não inventamos quantidade.</p>`;
+  else if (!slots.length) html += `<p class="empty">Sem horário definido.</p>`;
+  else html += `<div class="slots-mini">` + slots.map(sl => `<div class="slot-mini ${sl.cut ? "is-cheio" : "is-vago"}">
+      <b class="hora">${esc(sl.h)}</b>
+      <span class="fmt">${esc(sl.m.formato || sl.m.id)}${sl.pausada ? " · pausada" : ""}</span>
+      <span class="what">${sl.cut ? esc(sl.cut.hook || sl.cut.id) : "vago"}</span>
+    </div>`).join("") + `</div>`;
+  if (setHtml(root, html)) countUp(root);
+}
+const PLAT_NOME = { instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube" };
+function renderNumerosCompacto(){
+  const root = $("#numeros-mini");
+  if (!root) return;
+  const html = numerosData().map(n => {
+    const v = n.val == null ? NaN : Number(n.val);
+    const valor = Number.isFinite(v)
+      ? `<b class="num" data-count="${v}">${v.toLocaleString("pt-BR")}</b><span class="num-un">${n.pl === "youtube" ? "inscritos" : "seguidores"}</span>`
+      : SEM_DADOS;
+    return `<div class="num-card ${n.pl}">
+      <p class="num-plat"><i aria-hidden="true"></i>${PLAT_NOME[n.pl]}</p>
+      <p class="num-handle">${esc(n.handle)}</p>
+      ${valor}
+      <span class="num-fonte">${esc(n.fonte)}</span>
     </div>`;
   }).join("");
-  $$("#dash-pending [data-play]").forEach(el => {
-    el.addEventListener("click", () => openPlayer(el.dataset.play));
-  });
+  if (setHtml(root, html)) countUp(root);
 }
 
 function renderProfiles(){
@@ -823,6 +961,7 @@ function renderProfiles(){
     applyTheme(currentProfile());
     fillProfileSelects();
     loadFila(); loadLives(); renderDashboard(); renderProfiles();
+    loadMaestri();
   }));
 }
 
@@ -855,6 +994,7 @@ async function onCreateProfile(e){
   $("#profile-form").reset();
   toast("Perfil criado. A fila dele começa vazia.");
   renderProfiles(); renderDashboard(); loadFila();
+  loadMaestri();
 }
 
 async function loadLives(){
@@ -1044,6 +1184,7 @@ async function loadMaestri(){
   if (tab === "novo") renderPedidos();
   if (tab === "numeros") renderNumeros();
   if (tab === "formatos") renderFormatos();
+  renderDashboard();
 }
 async function loadDiario(){
   const el = $("#diario-lines");
@@ -1066,13 +1207,37 @@ function todayISO(){
   const g = k => (parts.find(p => p.type===k) || {}).value;
   return `${g("year")}-${g("month")}-${g("day")}`;
 }
+function metaStatus(m){
+  return m.ativo === false || /pausad/i.test(m.status||"") ? "pausada" : (m.status || "ativa");
+}
+// "AAAA-MM-DD HH:MM" no fuso de Brasília
+function agendaKey(when){
+  const d = new Date(when);
+  if (isNaN(d)) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone:"America/Sao_Paulo", hour:"2-digit", minute:"2-digit", year:"numeric", month:"2-digit", day:"2-digit", hour12:false }).formatToParts(d);
+  const g = k => (parts.find(p=>p.type===k)||{}).value;
+  return `${g("year")}-${g("month")}-${g("day")} ${g("hour")}:${g("minute")}`;
+}
+// Horários das metas de hoje contra a agenda. Fonte única da aba Hoje e do resumo da home.
+function hojeSlots(){
+  const iso = todayISO();
+  const byId = Object.fromEntries(cutsForProfile(allCuts).map(c => [c.id, c]));
+  const byKey = {};
+  agendaRows.forEach(a => { const k = agendaKey(a.scheduled_at); if (k && !(k in byKey)) byKey[k] = a; });
+  return metas.map(m => ({
+    m,
+    slots: (m.horarios || []).map(h => {
+      const hit = byKey[`${iso} ${String(h).padStart(5,"0")}`];
+      return { h, cut: (hit && byId[hit.cut_id]) || null };
+    }),
+  }));
+}
 function renderHoje(){
   const root = $("#hoje-lista");
   if (!root) return;
   const titulo = $("#hoje-titulo");
-  const iso = todayISO();
   if (titulo){
-    const [y,m,d] = iso.split("-");
+    const [, m, d] = todayISO().split("-");
     titulo.textContent = `Hoje · ${d}/${m}`;
   }
   if (!hasMetas){ root.innerHTML = ""; return; }
@@ -1080,39 +1245,14 @@ function renderHoje(){
     root.innerHTML = `<p class="muted">Nenhuma meta neste perfil. Cadastre na aba Metas, ou deixe vazio — não inventamos quantidade.</p>`;
     return;
   }
-  const cuts = cutsForProfile(allCuts);
-  const byId = Object.fromEntries(cuts.map(c => [c.id, c]));
-  let html = "";
-  metas.forEach(m => {
-    const horas = m.horarios || [];
+  root.innerHTML = hojeSlots().map(({ m, slots }) => {
     const por = m.por_dia == null ? "a definir" : m.por_dia;
-    const status = m.ativo === false || /pausad/i.test(m.status||"") ? "pausada" : (m.status || "ativa");
-    html += `<div class="meta-card"><h3>${esc(m.formato || m.id)}</h3>
-      <p class="meta">${esc(por)} por dia · ${esc(status)}</p>`;
-    if (!horas.length){
-      html += `<p class="muted">Sem horário definido.</p>`;
-    } else {
-      horas.forEach(h => {
-        const when = `${iso}T${String(h).padStart(5,"0")}`;
-        const booked = agendaRows.filter(a => (a.scheduled_at||"").slice(0,16).replace(" ","T") === when ||
-          (brDate(a.scheduled_at).includes(h) && (a.scheduled_at||"").slice(0,10) === iso));
-        // simpler: match date + hour
-        const hit = agendaRows.find(a => {
-          const d = new Date(a.scheduled_at);
-          const parts = new Intl.DateTimeFormat("en-GB", { timeZone:"America/Sao_Paulo", hour:"2-digit", minute:"2-digit", year:"numeric", month:"2-digit", day:"2-digit", hour12:false }).formatToParts(d);
-          const g = k => (parts.find(p=>p.type===k)||{}).value;
-          const day = `${g("year")}-${g("month")}-${g("day")}`;
-          const hm = `${g("hour")}:${g("minute")}`;
-          return day === iso && hm === String(h).padStart(5,"0");
-        });
-        const cut = hit ? byId[hit.cut_id] : null;
-        const right = cut ? esc(cut.hook || cut.id) : "vago";
-        html += `<div class="slot"><div><div class="hora">${esc(h)}</div><p class="meta">${esc(m.formato||m.id)}</p></div><div>${right}</div></div>`;
-      });
-    }
-    html += `</div>`;
-  });
-  root.innerHTML = html;
+    const linhas = !slots.length
+      ? `<p class="muted">Sem horário definido.</p>`
+      : slots.map(({ h, cut }) => `<div class="slot${cut ? " is-cheio" : ""}"><div><div class="hora">${esc(h)}</div><p class="meta">${esc(m.formato||m.id)}</p></div><div>${cut ? esc(cut.hook || cut.id) : "vago"}</div></div>`).join("");
+    return `<div class="meta-card"><h3>${esc(m.formato || m.id)}</h3>
+      <p class="meta">${esc(por)} por dia · ${esc(metaStatus(m))}</p>${linhas}</div>`;
+  }).join("");
 }
 function renderMetas(){
   const root = $("#metas-lista");
@@ -1305,23 +1445,28 @@ async function onFormatoAct(id, act){
 function lastStat(plat, field){
   return (statRows || []).find(n => n.platform === plat && n.scope === "conta" && n[field] != null);
 }
+// Último número de seguidores por plataforma. Fonte única da aba Números e do resumo da home.
+function numerosData(){
+  return ["instagram","tiktok","youtube"].map(pl => {
+    const acc = (accountRows || []).find(a => a.platform === pl);
+    const fol = lastStat(pl, "followers");
+    return {
+      pl,
+      handle: (acc && acc.handle) || (currentProfile().platforms && currentProfile().platforms[pl]) || "",
+      val: fol && fol.followers != null ? fol.followers : null,
+      fonte: fol ? `${fol.source || "manual"} · ${brDate(fol.captured_at)}` : "",
+    };
+  });
+}
 function renderNumeros(){
   const root = $("#numeros-corpo");
   if (!root) return;
   if (!hasStats && !hasAccounts){ root.innerHTML = `<p class="muted">sem dados ainda</p>`; return; }
-  const plats = ["instagram","tiktok","youtube"];
-  const cards = plats.map(pl => {
-    const acc = (accountRows || []).find(a => a.platform === pl);
-    const fol = lastStat(pl, "followers");
-    const handle = (acc && acc.handle) || (currentProfile().platforms && currentProfile().platforms[pl]) || "";
-    const val = fol && fol.followers != null ? fol.followers : null;
-    const fonte = fol ? `${fol.source || "manual"} · ${brDate(fol.captured_at)}` : "";
-    return `<div class="stat">
+  const cards = numerosData().map(({ pl, handle, val, fonte }) => `<div class="stat">
       <span>${pl}${handle? " · "+esc(handle):""}</span>
       <b>${val == null ? "sem dados ainda" : val.toLocaleString("pt-BR")}</b>
       <span>${esc(fonte)}</span>
-    </div>`;
-  }).join("");
+    </div>`).join("");
   const hasAny = (statRows || []).some(n => n.followers != null || n.views != null);
   root.innerHTML = `<div class="num-grid">${cards}</div>` + (hasAny ? "" : `<p class="muted">sem dados ainda</p>`);
 }

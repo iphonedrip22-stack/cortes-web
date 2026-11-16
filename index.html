@@ -24,7 +24,7 @@
     #boot-error.is-on{display:block}
     noscript p{max-width:420px;margin:16px auto;color:#ffd400}
   </style>
-  <link rel="stylesheet" href="css/app.css?v=maestri3">
+  <link rel="stylesheet" href="css/app.css?v=motion1">
   <script>
     (function () {
       try { if (window.top !== window.self) window.top.location = window.self.location; } catch (e) {}
@@ -80,75 +80,124 @@
   </section>
 
   <div id="app-shell">
-    <aside class="sider" id="sider">
-      <div class="brand sider-brand">
-        <span class="mark" id="app-mark">CS</span>
-        <div>
-          <h1 id="app-title">Cortes Studio</h1>
-          <p class="muted" id="app-tag">Workspace</p>
-        </div>
+    <nav class="rail" id="rail" aria-label="Seções">
+      <span class="mark rail-mark" id="app-mark" aria-hidden="true">CS</span>
+      <a class="tab rail-i" href="#/inicio" data-tab="fila" aria-label="Início" data-tip="Início">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        <span class="rail-l">Início</span>
+      </a>
+      <a class="tab rail-i" href="#/hoje" data-tab="hoje" aria-label="Hoje" data-tip="Hoje">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span class="rail-l">Hoje</span>
+      </a>
+      <a class="tab rail-i" href="#/numeros" data-tab="numeros" aria-label="Números" data-tip="Números">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M11 20V4M17 20v-7M21 20H3"/></svg>
+        <span class="rail-l">Números</span>
+      </a>
+      <div class="rail-more" id="rail-more">
+        <a class="tab rail-i" href="#/metas" data-tab="metas" aria-label="Metas" data-tip="Metas">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+          <span class="rail-l">Metas</span>
+        </a>
+        <a class="tab rail-i" href="#/formatos" data-tab="formatos" aria-label="Formatos" data-tip="Formatos">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/></svg>
+          <span class="rail-l">Formatos</span>
+        </a>
+        <a class="tab rail-i" href="#/projetos" data-tab="projetos" aria-label="Projetos" data-tip="Projetos">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+          <span class="rail-l">Projetos</span>
+        </a>
+        <a class="tab rail-i" href="#/lives" data-tab="lives" aria-label="Lives" data-tip="Lives">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M7.8 16.2a6 6 0 010-8.4M16.2 7.8a6 6 0 010 8.4M5 19a10 10 0 010-14M19 5a10 10 0 010 14"/></svg>
+          <span class="rail-l">Lives</span>
+        </a>
+        <a class="tab rail-i" href="#/perfis" data-tab="perfis" aria-label="Perfis" data-tip="Perfis">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+          <span class="rail-l">Perfis</span>
+        </a>
+        <a class="tab rail-i" href="#/novo" data-tab="novo" aria-label="Pedir formato novo" data-tip="Pedir formato novo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3"/></svg>
+          <span class="rail-l">Pedir formato</span>
+        </a>
+        <button type="button" class="rail-i rail-out" id="logout-btn" aria-label="Sair" data-tip="Sair">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M10 16l4-4-4-4M14 12H4"/></svg>
+          <span class="rail-l">Sair</span>
+        </button>
       </div>
-      <label class="profile-switch">Perfil
-        <select id="profile-select" aria-label="Perfil de cortes"></select>
-      </label>
-      <nav class="side-nav" role="tablist">
-        <a class="tab is-on" href="#/fila" data-tab="fila">Fila</a>
-        <a class="tab" href="#/hoje" data-tab="hoje">Hoje</a>
-        <a class="tab" href="#/metas" data-tab="metas">Metas</a>
-        <a class="tab" href="#/novo" data-tab="novo">Novo</a>
-        <a class="tab" href="#/numeros" data-tab="numeros">Números</a>
-        <a class="tab" href="#/formatos" data-tab="formatos">Formatos</a>
-        <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
-        <a class="tab" href="#/lives" data-tab="lives">Lives</a>
-        <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
-        <a class="tab" href="#/inicio" data-tab="inicio">Início</a>
-      </nav>
-      <p class="sider-note">Nada é publicado por aqui. Aprovar só registra a decisão.</p>
-      <button type="button" class="btn ghost sider-out" id="logout-btn">Sair</button>
-    </aside>
+      <a class="rail-i rail-plus" id="rail-plus" href="#/projetos/novo" aria-label="Novo projeto (solte ou cole um link https aqui)" data-tip="Novo projeto · solte ou cole um link">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="rail-l">Novo</span>
+      </a>
+      <button type="button" class="rail-i rail-more-btn" id="rail-more-btn" aria-label="Mais seções" aria-expanded="false" aria-controls="rail-more">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+        <span class="rail-l">Mais</span>
+      </button>
+    </nav>
 
     <div class="mainwrap">
-      <header class="top mobile-only">
+      <header class="top">
         <div class="brand">
-          <span class="mark sm" id="app-mark-m">CS</span>
+          <span class="mark sm mobile-only" id="app-mark-m" aria-hidden="true">CS</span>
           <div>
-            <h1 id="app-title-m">Cortes Studio</h1>
-            <p id="profile-label-m" class="muted"></p>
+            <h1 id="app-title">Cortes Studio</h1>
+            <p id="app-tag" class="muted">Workspace</p>
           </div>
         </div>
-        <select id="profile-select-m" aria-label="Perfil de cortes"></select>
+        <label class="profile-switch"><span>Perfil</span>
+          <select id="profile-select" aria-label="Perfil de cortes"></select>
+        </label>
       </header>
-      <nav class="abas mobile-only" aria-label="Seções">
-        <a class="tab is-on" href="#/fila" data-tab="fila">Fila</a>
-        <a class="tab" href="#/hoje" data-tab="hoje">Hoje</a>
-        <a class="tab" href="#/metas" data-tab="metas">Metas</a>
-        <a class="tab" href="#/novo" data-tab="novo">Novo</a>
-        <a class="tab" href="#/numeros" data-tab="numeros">Números</a>
-        <a class="tab" href="#/formatos" data-tab="formatos">Formatos</a>
-        <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
-        <a class="tab" href="#/lives" data-tab="lives">Lives</a>
-        <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
-        <a class="tab" href="#/inicio" data-tab="inicio">Início</a>
-      </nav>
 
       <main>
-        <section id="tab-inicio" class="panel">
-          <div class="hero card">
-            <p class="kicker" id="dash-kicker">Perfil</p>
-            <h2 id="dash-title">Direto ao Osso</h2>
-            <p class="muted" id="dash-sub">empreendedorismo · @diretoaosso</p>
-            <div class="quick">
-              <a class="btn primary" href="#/projetos/novo">Novo projeto</a>
-              <a class="btn ghost" href="#/cortes">Ver cortes</a>
+        <section id="tab-fila" class="panel home is-on">
+          <div class="block home-fila">
+            <div class="block-head">
+              <div>
+                <h2>Fila <span class="count" id="fila-count"></span></h2>
+                <p class="hint tight" id="dash-sub">Cortes do perfil aguardando você</p>
+              </div>
+              <div class="row">
+                <select id="fila-filter" aria-label="Filtrar cortes">
+                  <option value="pending">Pendentes</option>
+                  <option value="all">Todos</option>
+                  <option value="approved">Aprovados</option>
+                  <option value="rejected">Rejeitados</option>
+                  <option value="ajuste">Ajuste pedido</option>
+                  <option value="live">Lives</option>
+                </select>
+                <button type="button" class="btn ghost icon" id="reload-fila" aria-label="Atualizar fila" title="Atualizar fila">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg>
+                </button>
+                <a class="btn ghost sm home-only" href="#/fila/completa">Fila completa</a>
+                <a class="btn ghost sm full-only" href="#/inicio">← Painel</a>
+              </div>
             </div>
+            <p class="hint tight">Toque na capa para assistir. Aprovar e rejeitar só gravam a decisão. Nada é publicado.</p>
+            <div id="fila" class="grid" aria-busy="true">
+              <div class="cut sk"></div><div class="cut sk"></div><div class="cut sk"></div><div class="cut sk"></div>
+            </div>
+            <a class="btn ghost fila-more home-only" id="fila-more" href="#/fila/completa" hidden>Ver todos</a>
           </div>
-          <div class="stats" id="dash-stats"></div>
-          <div class="card">
-            <div class="fila-head">
-              <h2>Pendentes de aprovação</h2>
-              <a class="btn ghost" href="#/cortes">Fila completa</a>
+          <div class="home-side">
+            <div class="block home-hoje">
+              <div class="block-head">
+                <h2>Hoje <span class="count" id="hoje-mini-data"></span></h2>
+                <a class="btn ghost sm" href="#/hoje">Ver tudo →</a>
+              </div>
+              <div id="hoje-mini">
+                <div class="kpis"><div class="kpi sk"></div><div class="kpi sk"></div><div class="kpi sk"></div></div>
+                <div class="slot-mini sk"></div><div class="slot-mini sk"></div>
+              </div>
             </div>
-            <div id="dash-pending" class="mini-list"></div>
+            <div class="block home-num">
+              <div class="block-head">
+                <h2>Números</h2>
+                <a class="btn ghost sm" href="#/numeros">Ver tudo →</a>
+              </div>
+              <div id="numeros-mini" class="num-mini">
+                <div class="num-card sk"></div><div class="num-card sk"></div><div class="num-card sk"></div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -202,27 +251,6 @@
               <pre class="log" id="job-log" hidden></pre>
             </div>
           </div>
-        </section>
-
-        <section id="tab-fila" class="panel is-on">
-          <div class="fila-head">
-            <div>
-              <h2>Fila</h2>
-              <p class="hint tight">Toque na capa para assistir. Aprovar e rejeitar só gravam a decisão. Nada é publicado.</p>
-            </div>
-            <div class="row">
-              <select id="fila-filter" aria-label="Filtrar cortes">
-                <option value="pending">Pendentes</option>
-                <option value="all">Todos</option>
-                <option value="approved">Aprovados</option>
-                <option value="rejected">Rejeitados</option>
-                <option value="ajuste">Ajuste pedido</option>
-                <option value="live">Lives</option>
-              </select>
-              <button type="button" class="btn ghost" id="reload-fila">Atualizar</button>
-            </div>
-          </div>
-          <div id="fila" class="grid"></div>
         </section>
 
 
@@ -451,14 +479,6 @@
       </main>
       <p class="foot">Cortes Studio · aprovação só registra a decisão · custo R$ 0</p>
     </div>
-
-    <nav class="dock mobile-only" role="tablist">
-      <a class="tab is-on" href="#/fila" data-tab="fila">Fila</a>
-      <a class="tab" href="#/hoje" data-tab="hoje">Hoje</a>
-      <a class="tab" href="#/projetos" data-tab="projetos">Projetos</a>
-      <a class="tab" href="#/lives" data-tab="lives">Lives</a>
-      <a class="tab" href="#/perfis" data-tab="perfis">Perfis</a>
-    </nav>
   </div>
 
   <div class="player" id="player" hidden>
@@ -506,6 +526,6 @@
 
   <script src="js/config.js?v=maestri3"></script>
   <script src="js/supabase.umd.js?v=maestri3"></script>
-  <script src="js/app.js?v=maestri3" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
+  <script src="js/app.js?v=motion1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
 </body>
 </html>
