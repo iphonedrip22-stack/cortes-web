@@ -23,3 +23,8 @@ Depois da migration inicial, cole também `sql/migration_profiles.sql` no SQL Ed
 ## Painel Maestri (terceiro SQL)
 
 Cole `sql/migration_maestri.sql` no SQL Editor do projeto **cortes** (não o hs3d) para ligar Metas, agenda, pedidos de formato, Números e liberação de formato. Até lá o site continua no ar e essas abas avisam que falta o SQL. Números só mostram valores reais; se não houver coleta, aparece “sem dados ainda”. Nada é publicado por aqui.
+
+
+## Endurecimento (SQL atual)
+
+Cole `sql/hardening.sql` no SQL Editor do projeto **cortes** (não o hs3d). Esse arquivo substitui o `migration_maestri.sql` antigo: cria as tabelas do painel se faltarem, coloca uma allowlist de admin e troca as policies para que só esses e-mails leiam ou escrevam. Também desligue o cadastro aberto em Authentication → Sign In / Providers → Email → **Allow new users to sign up**.

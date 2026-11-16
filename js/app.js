@@ -80,6 +80,15 @@ function toast(msg){
 function esc(s){
   return String(s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 }
+function safeUrl(u){
+  u = String(u||"").trim();
+  if (!/^https:\/\//i.test(u)) return null;
+  return u;
+}
+function hrefAttr(u){
+  const s = safeUrl(u);
+  return s ? `href="${esc(s)}"` : "";
+}
 function stageLabel(key){ return (STAGES.find(s=>s[0]===key)||[key,key])[1]; }
 function currentProfile(){
   return profiles.find(p => p.id === currentProfileId) || profiles[0] || FALLBACK_PROFILE;
@@ -552,7 +561,7 @@ async function renderProjects(projectId, focusNew){
       if (job) job.hidden = true;
       const hero = $("#project-hero");
       if (hero){
-        const link = proj.source_url ? ` · <a href="${esc(proj.source_url)}" target="_blank" rel="noopener">vídeo original</a>` : "";
+        const link = safeUrl(proj.source_url) ? ` · <a ${hrefAttr(proj.source_url)} target="_blank" rel="noopener">vídeo original</a>` : "";
         hero.innerHTML = `<p class="kicker">${esc(proj.short)}</p>
           <h2>${esc(proj.title)}</h2>
           <p class="meta">${proj.items.length} corte${proj.items.length===1?"":"s"} · ${proj.pending} pendente${proj.pending===1?"":"s"}${link}</p>`;
@@ -883,7 +892,7 @@ async function loadLives(){
   else ul.innerHTML = ch.map(c => `<li>
     <div class="name"><strong>${esc(c.name||c.handle||c.id)}</strong>
       <span>${c.enabled===false?"pausado":"ligado"}</span></div>
-    <a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.url)}</a>
+    <a ${hrefAttr(c.url)} target="_blank" rel="noopener">${esc(c.url)}</a>
     <div class="actions">
       <button class="btn ghost" data-ch="${esc(c.id)}" data-op="toggle">${c.enabled===false?"Ligar":"Pausar"}</button>
       <button class="btn danger" data-ch="${esc(c.id)}" data-op="del">Remover</button>
@@ -1167,7 +1176,7 @@ function renderPedidos(){
     <h3>${esc(p.name || "sem nome")}</h3>
     <p class="meta">${esc(stNome[p.status] || p.status)} · ${esc(p.mode || "")} · ${esc(brDate(p.created_at))}</p>
     <p>${esc(p.premise || p.notes || "")}</p>
-    ${p.link ? `<p class="meta"><a href="${esc(p.link)}" target="_blank" rel="noopener">${esc(p.link)}</a></p>` : ""}
+    ${safeUrl(p.link) ? `<p class="meta"><a ${hrefAttr(p.link)} target="_blank" rel="noopener">${esc(p.link)}</a></p>` : ""}
   </div>`).join("");
 }
 async function onPedido(e){
@@ -1279,23 +1288,16 @@ function renderFormatos(){
 }
 async function onFormatoAct(id, act){
   if (!hasFormats || !id) return;
-  const { data: sessionData } = await sb.auth.getUser();
-  const email = sessionData && sessionData.user && sessionData.user.email;
-  const patch = { updated_by: email || null };
+  let error;
   if (act === "liberar"){
-    patch.status = "liberado";
-    patch.liberado_at = new Date().toISOString();
-    patch.liberado_by = email || null;
-    patch.status_reason = "Liberado no painel (10 revisados e 80% aprovados). Postar continua exigindo ok do Matheus.";
-  } else if (act === "pausar"){
-    patch.status = "pausado";
-    patch.status_reason = "Pausado no painel.";
+    const res = await sb.rpc("cortes_liberar_formato", { p_id: id });
+    error = res.error;
   } else {
-    patch.status = "em_teste";
-    patch.status_reason = "Voltado para teste no painel.";
+    const status = act === "pausar" ? "pausado" : "em_teste";
+    const res = await sb.rpc("cortes_set_formato_status", { p_id: id, p_status: status });
+    error = res.error;
   }
-  const { error } = await sb.from("formats").update(patch).eq("id", id);
-  if (error){ toast(error.message); return; }
+  if (error){ toast(error.message || "Não consegui atualizar o formato."); return; }
   toast(act === "liberar" ? "Formato liberado. Postar continua precisando do seu ok." : "Status do formato atualizado.");
   await loadMaestri();
   renderFormatos();
