@@ -1,0 +1,17 @@
+-- NÃO rode este arquivo a menos que o Matheus peça.
+-- O template de cores do corte NÃO precisa de coluna, tabela, RLS nem mudança de auth.
+-- Ele entra na coluna jsonb que já existe: public.profiles.theme
+--   theme.cut_template = 'incisao' | 'empreendedorismo'
+--   theme.bg / theme.accent / theme.text acompanham o papel, o destaque e a tinta do template.
+-- O portal grava isso no criar/atualizar perfil. O worker lê theme.cut_template e passa --theme ao render.
+-- Nenhuma alteração de schema é necessária para a função ficar operável.
+
+-- Exemplo opcional, só se quiser forçar o perfil Direto ao Osso para Incisão no banco:
+-- update public.profiles
+-- set theme = coalesce(theme, '{}'::jsonb) || jsonb_build_object(
+--   'cut_template', 'incisao',
+--   'bg', '#F2EDE4',
+--   'text', '#111111',
+--   'accent', '#E8261C'
+-- )
+-- where handle ilike '%fenri_oficial%' or name ilike '%direto ao osso%';

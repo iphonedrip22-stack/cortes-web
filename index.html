@@ -23,13 +23,13 @@
     #login-form h1{margin:0 0 4px;font-size:1.35rem;font-family:Sora,ui-sans-serif,system-ui,sans-serif;font-weight:700}
     #login-form p{margin:0 0 12px;color:#8C9AC9;font-size:.85rem}
     #login-form label{display:block;margin:0 0 12px;font-size:.8rem;color:#8C9AC9}
-    #login-form input{width:100%;box-sizing:border-box;margin-top:6px;background:#050a1c;color:#E8EEFF;border:1px solid #2a3a6e;border-radius:10px;padding:11px 12px}
-    #login-btn{border:0;border-radius:999px;padding:11px 16px;font-weight:700;background:#2F5AE8;color:#fff;width:100%;cursor:pointer}
+    #login-form input{width:100%;box-sizing:border-box;margin-top:6px;background:#050a1c;color:#E8EEFF;border:1px solid #2a3a6e;border-radius:10px;padding:11px 12px;min-height:44px}
+    #login-btn{border:0;border-radius:999px;padding:11px 16px;font-weight:700;background:#2F5AE8;color:#fff;width:100%;cursor:pointer;min-height:44px}
     #boot-error{display:none;max-width:420px;margin:16px auto;background:#3a1116;color:#ffd0d4;border:1px solid #ff5a6a;border-radius:12px;padding:12px 14px;font-size:.9rem}
     #boot-error.is-on{display:block}
     noscript p{max-width:420px;margin:16px auto;color:#FF6B3D}
   </style>
-  <link rel="stylesheet" href="css/app.css?v=zymiara1">
+  <link rel="stylesheet" href="css/app.css?v=zymiara2">
   <script>
     (function () {
       try { if (window.top !== window.self) window.top.location = window.self.location; } catch (e) {}
@@ -463,9 +463,11 @@
                 <option value="storytelling">Storytelling</option>
               </select>
             </label>
-            <label>Cor de destaque
-              <input type="color" id="pf-accent" value="#ffd400">
-            </label>
+            <fieldset class="tmpl-fieldset">
+              <legend>Template de cores do corte</legend>
+              <p class="hint tight">Escolhe a paleta deste perfil. Só a palavra de destaque da legenda muda de cor. O gancho continua na caixa branca, Montserrat Black, no mesmo lugar.</p>
+              <div class="tmpl-picker" id="pf-tmpl-picker" role="radiogroup" aria-label="Template de cores do corte"></div>
+            </fieldset>
             <div class="row-3">
               <label>Instagram
                 <input type="text" id="pf-ig" placeholder="@conta">
@@ -531,6 +533,7 @@
 
   <script src="js/config.js?v=maestri3"></script>
   <script src="js/supabase.umd.js?v=maestri3"></script>
-  <script src="js/app.js?v=zymiara1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
+  <script src="js/cut-templates.js?v=zymiara2"></script>
+  <script src="js/app.js?v=zymiara2" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
 </body>
 </html>

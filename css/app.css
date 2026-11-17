@@ -350,11 +350,28 @@ a.btn.ghost{color:var(--text)}
 .num-plat{margin:0;font-weight:var(--w-black);font-size:1rem;display:flex;align-items:center;gap:var(--s-2)}
 .num-plat i{width:8px;height:8px;border-radius:50%;background:var(--plat);box-shadow:0 0 10px var(--plat)}
 .num-handle{margin:2px 0 var(--s-3);min-height:1em;color:var(--muted);font-size:var(--t-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.num-card .num{margin-top:auto;font-family:var(--mono);font-size:clamp(1.6rem,18cqi,3.25rem);font-weight:500;letter-spacing:-.03em;line-height:var(--lh-tight);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.num-card .num{margin-top:auto;font-family:var(--mono);font-size:clamp(1.15rem,16cqi,3.25rem);font-weight:500;letter-spacing:-.03em;line-height:var(--lh-tight);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .num-card .nodata{margin-top:auto;font-size:1.05rem;padding:6px 0}
 .num-un{color:var(--muted);font-size:var(--t-sm)}
 .num-fonte{margin-top:var(--s-2);min-height:1em;color:var(--faint);font-size:.68rem}
 
+@media(min-width:768px) and (max-width:1023px){
+  .home.is-on:not(.is-full){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--s-4);
+    height:calc(100dvh - var(--top) - var(--dock) - env(safe-area-inset-bottom,0px) - 24px);
+    max-height:calc(100dvh - var(--top) - var(--dock) - env(safe-area-inset-bottom,0px) - 24px);
+    min-height:0;overflow:hidden}
+  .home:not(.is-full) .home-fila{min-height:0;display:flex;flex-direction:column}
+  .home:not(.is-full) #fila{flex:1;min-height:0;overflow-y:auto;padding-right:var(--s-1);scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .home:not(.is-full) .fila-more{display:none}
+  .home:not(.is-full) #fila > .cut:nth-child(n+5){display:flex}
+  .home .home-side{display:grid;grid-template-rows:minmax(0,1fr) auto;gap:var(--s-4);min-height:0}
+  .home-hoje,.home-num{display:flex;flex-direction:column;min-height:0}
+  #hoje-mini{flex:1}
+  .slots-mini{flex:1;overflow-y:auto;padding-right:var(--s-1);scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .home-num .num-mini{grid-template-columns:minmax(0,1fr);gap:var(--s-2)}
+  .home-num .num-card{min-height:0;padding:10px 12px}
+  .home-num .num-card .num{font-size:1.35rem;white-space:nowrap}
+}
 @media(min-width:1024px){
   .panel.home{max-width:1680px}
   .block{padding:var(--s-5)}
@@ -475,4 +492,40 @@ a.proj .meta{margin:0}
   *,*::before,*::after{animation-duration:.01ms !important;animation-delay:0s !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;transition-delay:0s !important;scroll-behavior:auto !important}
   body::before,.sk::after{animation:none !important}
   .btn:hover,.cut:hover,.num-card:hover,.profile-card:hover,a.proj:hover,.rail-i:hover svg,.rail-plus:hover svg{transform:none !important}
+}
+
+
+/* ───── Template de cores do corte ───── */
+.tmpl-fieldset{border:0;margin:0 0 var(--s-3);padding:0;min-width:0}
+.tmpl-fieldset legend{font-family:var(--display);font-weight:var(--w-bold);margin-bottom:4px}
+.tmpl-fieldset .hint{margin:0}
+.tmpl-picker{display:grid;gap:10px;margin-top:8px}
+@media(min-width:600px){.tmpl-picker:not(.tmpl-picker-sm){grid-template-columns:1fr 1fr}}
+.tmpl-opt{display:flex;gap:12px;align-items:center;width:100%;border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;min-height:52px;background:var(--surface-2);color:inherit;cursor:pointer;text-align:left}
+.tmpl-opt.is-on{border-color:var(--accent-line);box-shadow:0 0 0 2px var(--accent-soft)}
+.tmpl-opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tmpl-swatch{display:inline-flex;width:52px;height:32px;border-radius:8px;overflow:hidden;flex-shrink:0;border:1px solid var(--line);vertical-align:middle}
+.tmpl-swatch i{flex:1;display:block;min-width:0}
+.tmpl-swatch.sm{width:18px;height:18px;border-radius:50%;margin-right:6px}
+.tmpl-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.tmpl-copy strong{font-size:.9rem;font-weight:var(--w-bold)}
+.tmpl-copy em{font-style:normal;font-size:var(--t-xs);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmpl-name{margin:4px 0 0;font-size:var(--t-xs);color:var(--muted)}
+.profile-card{display:flex;flex-direction:column;gap:12px;cursor:default}
+.profile-card-hit{display:block;width:100%;background:transparent;border:0;padding:0;margin:0;color:inherit;text-align:left;cursor:pointer;min-height:44px}
+.profile-card-hit:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Alvos de toque: 44px em botões, selects e campos, em todos os cortes */
+.btn,.btn.sm,.actions .btn,.cut .actions .btn{min-height:44px}
+.btn.icon,#reload-fila{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+.player-x{width:auto;min-width:44px;height:44px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center}
+#fila-filter,.block-head select,#profile-select,select,
+input[type=text],input[type=email],input[type=password],input[type=url],input[type=search]{min-height:44px}
+.gate input,.gate .btn, #login-form input, #login-btn{min-height:44px}
+.home:not(.is-full) .cut .actions .btn{padding:10px 4px}
+
+/* Evita que o último bloco fique preso atrás do dock no telemóvel/tablet */
+@media(max-width:899px){
+  main{padding-bottom:var(--s-2)}
+  .panel.is-on{padding-bottom:4px}
 }

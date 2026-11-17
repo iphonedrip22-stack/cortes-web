@@ -33,7 +33,7 @@ const FALLBACK_PROFILE = {
   handle: "diretoaosso",
   niche: "empreendedorismo",
   default_style: "close",
-  theme: { bg: "#0a0a0a", accent: "#ffd400", text: "#111111" },
+  theme: { cut_template: "incisao", bg: "#F2EDE4", accent: "#E8261C", text: "#111111" },
   platforms: { instagram: "@diretoaosso", tiktok: "@diretoaosso", youtube: "" },
 };
 
@@ -358,6 +358,7 @@ function bindApp(){
   $("#add-channel").addEventListener("submit", onAddChannel);
   $("#lives-settings").addEventListener("submit", onSaveSettings);
   $("#profile-form").addEventListener("submit", onCreateProfile);
+  initProfileTemplatePicker();
   $("#player-close").addEventListener("click", closePlayer);
   $("#player-close-bg").addEventListener("click", closePlayer);
   document.addEventListener("keydown", ev => { if (ev.key === "Escape"){ closePlayer(); railMore(false); } });
@@ -945,6 +946,63 @@ function renderNumerosCompacto(){
   if (setHtml(root, html)) countUp(root);
 }
 
+
+let pendingProfileTemplate = (window.CUT_TEMPLATES && window.CUT_TEMPLATES.default) || "incisao";
+
+function tmplSwatchHtml(tmpl, cls){
+  const t = tmpl || window.cutTemplateById();
+  if (!t) return "";
+  return `<span class="tmpl-swatch${cls?" "+cls:""}" aria-hidden="true"><i style="background:${esc(t.paper)}"></i><i style="background:${esc(t.ink)}"></i><i style="background:${esc(t.highlight)}"></i></span>`;
+}
+
+function renderTmplPicker(root, selectedId, onPick){
+  if (!root) return;
+  const list = (window.CUT_TEMPLATES && window.CUT_TEMPLATES.templates) || [];
+  const sel = selectedId || pendingProfileTemplate;
+  root.innerHTML = list.map(tmpl => `
+    <button type="button" class="tmpl-opt${tmpl.id===sel?" is-on":""}" role="radio" aria-checked="${tmpl.id===sel?"true":"false"}" data-tmpl="${esc(tmpl.id)}">
+      ${tmplSwatchHtml(tmpl)}
+      <span class="tmpl-copy">
+        <strong>${esc(tmpl.label)}</strong>
+        <em>${esc(tmpl.caption_font)} · destaque ${esc(tmpl.highlight)}</em>
+      </span>
+    </button>`).join("");
+  root.querySelectorAll("[data-tmpl]").forEach(btn => {
+    btn.addEventListener("click", ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const id = btn.dataset.tmpl;
+      renderTmplPicker(root, id, onPick);
+      if (onPick) onPick(id);
+    });
+  });
+}
+
+function initProfileTemplatePicker(){
+  pendingProfileTemplate = (window.CUT_TEMPLATES && window.CUT_TEMPLATES.default) || "incisao";
+  renderTmplPicker($("#pf-tmpl-picker"), pendingProfileTemplate, id => { pendingProfileTemplate = id; });
+}
+
+async function saveProfileCutTemplate(pid, tmplId){
+  const p = profiles.find(x => x.id === pid);
+  if (!p) return;
+  const tmpl = window.cutTemplateById(tmplId);
+  if (!tmpl) return;
+  const theme = window.themeFromCutTemplate(tmpl, p.theme && typeof p.theme === "object" ? p.theme : {});
+  if (hasProfiles){
+    const { data, error } = await sb.from("profiles").update({ theme }).eq("id", pid).select("*").single();
+    if (error){ toast(error.message || "Não consegui salvar o template."); return; }
+    const i = profiles.findIndex(x => x.id === pid);
+    if (i >= 0) profiles[i] = data;
+    if (pid === currentProfile().id) applyTheme(data);
+  } else {
+    p.theme = theme;
+    if (pid === currentProfile().id) applyTheme(p);
+  }
+  toast("Template de cores salvo neste perfil.");
+  renderProfiles();
+}
+
 function renderProfiles(){
   const box = $("#profiles-migrate");
   const form = $("#profile-form");
@@ -952,20 +1010,31 @@ function renderProfiles(){
   if (form) form.hidden = !hasProfiles;
   $("#profiles-grid").innerHTML = profiles.map(p => {
     const theme = p.theme && typeof p.theme === "object" ? p.theme : {};
+    const tmpl = window.cutTemplateById(window.inferCutTemplateId(theme));
     const on = p.id === currentProfile().id ? " is-on" : "";
-    return `<button type="button" class="profile-card${on}" data-pid="${esc(p.id)}">
-      <h3><span class="swatch" style="background:${esc(theme.accent||"#ffd400")}"></span>${esc(p.name)}</h3>
-      <p class="meta">${esc(p.handle ? "@"+p.handle.replace(/^@/,"") : "")} · ${esc(p.niche||"")} · ${esc(p.default_style||"")}</p>
-    </button>`;
+    return `<article class="profile-card${on}" data-pid="${esc(p.id)}">
+      <button type="button" class="profile-card-hit" data-select-pid="${esc(p.id)}">
+        <h3>${tmplSwatchHtml(tmpl, "sm")}${esc(p.name)}</h3>
+        <p class="meta">${esc(p.handle ? "@"+p.handle.replace(/^@/,"") : "")} · ${esc(p.niche||"")} · ${esc(p.default_style||"")}</p>
+        <p class="tmpl-name">Template: ${esc(tmpl ? tmpl.label : "—")}</p>
+      </button>
+      <div class="tmpl-picker tmpl-picker-sm" data-tmpl-for="${esc(p.id)}" role="radiogroup" aria-label="Template de cores de ${esc(p.name)}"></div>
+    </article>`;
   }).join("");
-  $$("#profiles-grid [data-pid]").forEach(b => b.addEventListener("click", () => {
-    currentProfileId = b.dataset.pid;
+  $$("#profiles-grid [data-select-pid]").forEach(b => b.addEventListener("click", () => {
+    currentProfileId = b.dataset.selectPid;
     storageSet("cortes.profile", currentProfileId);
     applyTheme(currentProfile());
     fillProfileSelects();
     loadFila(); loadLives(); renderDashboard(); renderProfiles();
     loadMaestri();
   }));
+  $$("#profiles-grid [data-tmpl-for]").forEach(box => {
+    const pid = box.dataset.tmplFor;
+    const prof = profiles.find(x => x.id === pid);
+    const cur = window.inferCutTemplateId(prof && prof.theme);
+    renderTmplPicker(box, cur, id => { saveProfileCutTemplate(pid, id); });
+  });
 }
 
 async function onCreateProfile(e){
@@ -979,7 +1048,7 @@ async function onCreateProfile(e){
     handle: handle || null,
     niche: $("#pf-niche").value.trim() || null,
     default_style: $("#pf-style").value,
-    theme: { bg: "#0b0d10", accent: $("#pf-accent").value || "#ffd400", text: "#111111" },
+    theme: window.themeFromCutTemplate(window.cutTemplateById(pendingProfileTemplate), {}),
     platforms: {
       instagram: $("#pf-ig").value.trim(),
       tiktok: $("#pf-tt").value.trim(),
@@ -995,6 +1064,7 @@ async function onCreateProfile(e){
   applyTheme(data);
   fillProfileSelects();
   $("#profile-form").reset();
+  initProfileTemplatePicker();
   toast("Perfil criado. A fila dele começa vazia.");
   renderProfiles(); renderDashboard(); loadFila();
   loadMaestri();
