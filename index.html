@@ -3,28 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Cortes Studio</title>
+  <title>ZYMIARA</title>
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://pwddnzrjctqqwzjdtgnt.supabase.co wss://pwddnzrjctqqwzjdtgnt.supabase.co; media-src 'self' blob: https://pwddnzrjctqqwzjdtgnt.supabase.co; img-src 'self' data: blob: https://pwddnzrjctqqwzjdtgnt.supabase.co; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; object-src 'none'; frame-ancestors 'none'">
-  <meta name="theme-color" content="#0b0d10">
+  <meta name="theme-color" content="#071233">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="icon" href="brand/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+  <link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
   <style>
-    html,body{margin:0;padding:0;background:#0b0d10;color:#f4f5f7;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    @font-face{font-family:Sora;src:url("fonts/Sora.woff2") format("woff2");font-weight:100 900;font-display:swap}
+    @font-face{font-family:Manrope;src:url("fonts/Manrope.woff2") format("woff2");font-weight:200 800;font-display:swap}
+    html,body{margin:0;padding:0;background:#071233;color:#E8EEFF;
+      font-family:Manrope,ui-sans-serif,system-ui,sans-serif;
       min-height:100%;min-height:100vh}
     #gate{min-height:100vh;padding:24px;display:block}
     body.is-in #gate,body.is-in .gate{display:none !important}
-    #login-form{max-width:420px;margin:12vh auto 0;background:#14171c;border:1px solid #2a3038;border-radius:16px;padding:18px}
-    #login-form h1{margin:0 0 4px;font-size:1.35rem}
-    #login-form p{margin:0 0 12px;color:#8b93a1;font-size:.85rem}
-    #login-form label{display:block;margin:0 0 12px;font-size:.8rem;color:#8b93a1}
-    #login-form input{width:100%;box-sizing:border-box;margin-top:6px;background:#0c0e12;color:#f4f5f7;border:1px solid #2a3038;border-radius:10px;padding:11px 12px}
-    #login-btn{border:0;border-radius:999px;padding:11px 16px;font-weight:700;background:#ffd400;color:#111;width:100%;cursor:pointer}
+    #login-form{max-width:420px;margin:12vh auto 0;background:#0c1638;border:1px solid #2a3a6e;border-radius:16px;padding:18px}
+    #login-form h1{margin:0 0 4px;font-size:1.35rem;font-family:Sora,ui-sans-serif,system-ui,sans-serif;font-weight:700}
+    #login-form p{margin:0 0 12px;color:#8C9AC9;font-size:.85rem}
+    #login-form label{display:block;margin:0 0 12px;font-size:.8rem;color:#8C9AC9}
+    #login-form input{width:100%;box-sizing:border-box;margin-top:6px;background:#050a1c;color:#E8EEFF;border:1px solid #2a3a6e;border-radius:10px;padding:11px 12px}
+    #login-btn{border:0;border-radius:999px;padding:11px 16px;font-weight:700;background:#2F5AE8;color:#fff;width:100%;cursor:pointer}
     #boot-error{display:none;max-width:420px;margin:16px auto;background:#3a1116;color:#ffd0d4;border:1px solid #ff5a6a;border-radius:12px;padding:12px 14px;font-size:.9rem}
     #boot-error.is-on{display:block}
-    noscript p{max-width:420px;margin:16px auto;color:#ffd400}
+    noscript p{max-width:420px;margin:16px auto;color:#FF6B3D}
   </style>
-  <link rel="stylesheet" href="css/app.css?v=motion1">
+  <link rel="stylesheet" href="css/app.css?v=zymiara1">
   <script>
     (function () {
       try { if (window.top !== window.self) window.top.location = window.self.location; } catch (e) {}
@@ -55,15 +60,15 @@
   </script>
 </head>
 <body>
-  <noscript><p>Ative o JavaScript para entrar no Cortes Studio.</p></noscript>
+  <noscript><p>Ative o JavaScript para entrar no ZYMIARA.</p></noscript>
   <p id="boot-error" hidden></p>
   <section class="gate" id="gate">
     <form class="card login-card" id="login-form">
       <div class="brand">
-        <span class="mark" id="login-mark">CS</span>
+        <span class="mark" id="login-mark"><img src="brand/mark.svg" width="36" height="36" alt=""></span>
         <div>
-          <h1 id="login-title">Cortes Studio</h1>
-          <p id="login-tag">Cortes para redes, em vários perfis</p>
+          <h1 id="login-title">ZYMIARA</h1>
+          <p id="login-tag">Cortes Studio · cortes para redes, em vários perfis</p>
         </div>
       </div>
       <p class="hint" id="config-warn" hidden>Esta página ainda não foi ligada ao banco. Recarregue quando o setup terminar.</p>
@@ -81,7 +86,7 @@
 
   <div id="app-shell">
     <nav class="rail" id="rail" aria-label="Seções">
-      <span class="mark rail-mark" id="app-mark" aria-hidden="true">CS</span>
+      <span class="mark rail-mark" id="app-mark" aria-hidden="true"><img src="brand/mark.svg" width="36" height="36" alt=""></span>
       <a class="tab rail-i" href="#/inicio" data-tab="fila" aria-label="Início" data-tip="Início">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="18" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
         <span class="rail-l">Início</span>
@@ -137,10 +142,10 @@
     <div class="mainwrap">
       <header class="top">
         <div class="brand">
-          <span class="mark sm mobile-only" id="app-mark-m" aria-hidden="true">CS</span>
+          <span class="mark sm mobile-only" id="app-mark-m" aria-hidden="true"><img src="brand/mark.svg" width="32" height="32" alt=""></span>
           <div>
-            <h1 id="app-title">Cortes Studio</h1>
-            <p id="app-tag" class="muted">Workspace</p>
+            <h1 id="app-title">ZYMIARA</h1>
+            <p id="app-tag" class="muted">Cortes Studio</p>
           </div>
         </div>
         <label class="profile-switch"><span>Perfil</span>
@@ -477,7 +482,7 @@
           </form>
         </section>
       </main>
-      <p class="foot">Cortes Studio · aprovação só registra a decisão · custo R$ 0</p>
+      <p class="foot">ZYMIARA · Cortes Studio · aprovação só registra a decisão · custo R$ 0</p>
     </div>
   </div>
 
@@ -526,6 +531,6 @@
 
   <script src="js/config.js?v=maestri3"></script>
   <script src="js/supabase.umd.js?v=maestri3"></script>
-  <script src="js/app.js?v=motion1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
+  <script src="js/app.js?v=zymiara1" onerror="window.showBootError && showBootError('Não carreguei o aplicativo. Atualize a página.')"></script>
 </body>
 </html>

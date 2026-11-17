@@ -1,4 +1,4 @@
-/* Cortes Studio — public GitHub Pages frontend. Uses only the anon key. */
+/* ZYMIARA — Cortes Studio frontend. Uses only the anon key. */
 const $ = (s, r=document) => r.querySelector(s);
 
 function storageGet(k){
@@ -38,8 +38,14 @@ const FALLBACK_PROFILE = {
 };
 
 const cfg = window.CORTES_CONFIG || {};
+const brandName = "ZYMIARA";
 const appName = cfg.appName || "Cortes Studio";
 const appTagline = cfg.appTagline || "Cortes para redes, em vários perfis";
+function productTag(){
+  const tag = appTagline || "";
+  const lower = tag ? tag.charAt(0).toLowerCase() + tag.slice(1) : "";
+  return lower ? `${appName} · ${lower}` : appName;
+}
 const configured = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
 
 let sb = null;
@@ -125,17 +131,13 @@ function currentProfile(){
 
 function applyTheme(p){
   const theme = p.theme && typeof p.theme === "object" ? p.theme : {};
-  const accent = theme.accent || "#ffd400";
-  const ink = theme.text || "#111111";
-  document.documentElement.style.setProperty("--accent", accent);
-  document.documentElement.style.setProperty("--accent-ink", ink);
-  const initials = (p.name || "CS").split(/\s+/).map(w => w[0]).join("").slice(0,2).toUpperCase();
-  ["login-mark","app-mark","app-mark-m"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = initials || "CS"; });
-  const title = appName;
-  document.title = `${p.name} · ${title}`;
-  ["login-title","app-title"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = title; });
-  if ($("#login-tag")) $("#login-tag").textContent = appTagline;
-  if ($("#app-tag")) $("#app-tag").textContent = p.name;
+  const profileAccent = theme.accent || "#3B6CFF";
+  document.documentElement.style.setProperty("--profile-accent", profileAccent);
+  /* O cromo do portal fica na paleta ZYMIARA. A cor do perfil não troca --accent. */
+  document.title = (p && p.name) ? `${p.name} · ${brandName}` : brandName;
+  ["login-title","app-title"].forEach(id => { const el=$( "#"+id ); if (el) el.textContent = brandName; });
+  if ($("#login-tag")) $("#login-tag").textContent = productTag();
+  if ($("#app-tag")) $("#app-tag").textContent = appName;
   if ($("#dash-sub")) $("#dash-sub").textContent = [p.name, p.niche, p.handle ? `@${p.handle.replace(/^@/,"")}` : ""].filter(Boolean).join(" · ");
 }
 
@@ -279,9 +281,10 @@ function showGate(){ document.body.classList.remove("is-in"); }
 
 async function boot(){
   try {
-    ["login-title","app-title"].forEach(id => { const el=$("#"+id); if (el) el.textContent = appName; });
-    if ($("#login-tag")) $("#login-tag").textContent = appTagline;
-    document.title = appName;
+    ["login-title","app-title"].forEach(id => { const el=$("#"+id); if (el) el.textContent = brandName; });
+    if ($("#login-tag")) $("#login-tag").textContent = productTag();
+    if ($("#app-tag")) $("#app-tag").textContent = appName;
+    document.title = brandName;
     sb = initClient();
     if (!sb){
       showError("Não carreguei a conexão com o banco. Atualize a página.");
